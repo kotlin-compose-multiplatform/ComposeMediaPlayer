@@ -192,5 +192,6 @@ actual class VideoPlayerState actual constructor() {
         sliderTimer.stop()
         playbin.stop()
         playbin.dispose()
+        gstVideoComponent.element.dispose()
     }
 }
