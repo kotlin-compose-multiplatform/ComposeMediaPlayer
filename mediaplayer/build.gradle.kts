@@ -48,6 +48,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.gst1.java.core)
             implementation(libs.gst1.java.swing)
+            implementation(libs.jna)
+            implementation(libs.jna.platform)
         }
 
         iosMain.dependencies {
