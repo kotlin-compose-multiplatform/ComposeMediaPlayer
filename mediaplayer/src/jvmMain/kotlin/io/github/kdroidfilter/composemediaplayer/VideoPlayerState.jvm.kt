@@ -193,5 +193,6 @@ actual class VideoPlayerState actual constructor() {
         playbin.stop()
         playbin.dispose()
         gstVideoComponent.element.dispose()
+        Gst.deinit()
     }
 }
