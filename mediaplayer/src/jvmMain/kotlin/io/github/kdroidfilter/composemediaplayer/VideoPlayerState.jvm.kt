@@ -24,7 +24,7 @@ actual class VideoPlayerState actual constructor() {
 
     private val sliderTimer = Timer(50, null)
 
-    // region: Déclaration des states @Composable
+    // region: Declaration of @Composable states
 
     private var _sliderPos by mutableStateOf(0f)
     actual var sliderPos: Float
@@ -68,12 +68,12 @@ actual class VideoPlayerState actual constructor() {
     // endregion
 
     init {
-        // Paramétrage GStreamer : level, bus, etc.
+        // GStreamer configuration: level, bus, etc.
         val levelElement = ElementFactory.make("level", "level")
         playbin.set("audio-filter", levelElement)
         playbin.setVideoSink(gstVideoComponent.element)
 
-        // Quand on arrive à la fin
+        // When playback reaches the end
         playbin.bus.connect(Bus.EOS {
             EventQueue.invokeLater {
                 if (loop) {
@@ -84,7 +84,7 @@ actual class VideoPlayerState actual constructor() {
             }
         })
 
-        // Récupérer les "peak" level
+        // Retrieve the "peak" levels
         playbin.bus.connect("element") { _, message ->
             if (message.source == levelElement) {
                 val struct = message.structure
@@ -110,7 +110,7 @@ actual class VideoPlayerState actual constructor() {
             }
         }
 
-        // Timer pour actualiser la position/durée
+        // Timer to update position/duration
         sliderTimer.addActionListener {
             if (!userDragging) {
                 val dur = playbin.queryDuration(Format.TIME)
@@ -144,7 +144,7 @@ actual class VideoPlayerState actual constructor() {
     actual val isPlaying: Boolean
         get() = playbin.isPlaying
 
-    // Fonctions communes
+    // Common functions
 
     actual fun openUri(uri: Any) {
         uri as String
@@ -153,7 +153,7 @@ actual class VideoPlayerState actual constructor() {
             val uri = if (uri.startsWith("http://") || uri.startsWith("https://")) {
                 URI(uri)
             } else {
-                // Convertir le chemin de fichier local en URI de fichier
+                // Convert the local file path to a file URI
                 File(uri).toURI()
             }
             playbin.setURI(uri)
@@ -178,8 +178,6 @@ actual class VideoPlayerState actual constructor() {
         _sliderPos = 0f
         _positionText = "0:00"
     }
-
-
 
     actual fun seekTo(value: Float) {
         val dur = playbin.queryDuration(Format.TIME)
