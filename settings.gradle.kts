@@ -29,5 +29,6 @@ dependencyResolutionManagement {
     }
 }
 include(":mediaplayer")
+include(":gstreamer-windows")
 include(":sample:composeApp")
 

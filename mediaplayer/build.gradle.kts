@@ -7,14 +7,12 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose)
-    alias(libs.plugins.google.osdetector)
 
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
 version = "0.0.1"
 
-val osClassifier = project.extensions.getByType<com.google.gradle.osdetector.OsDetector>().classifier
 
 kotlin {
     jvmToolchain(17)
