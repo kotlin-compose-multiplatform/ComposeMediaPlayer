@@ -29,6 +29,5 @@ dependencyResolutionManagement {
     }
 }
 include(":mediaplayer")
-include(":javafx-mediaplayer")
 include(":sample:composeApp")
 

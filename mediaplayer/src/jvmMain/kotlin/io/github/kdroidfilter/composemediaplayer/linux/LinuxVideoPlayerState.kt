@@ -19,6 +19,31 @@ import java.util.*
 import javax.swing.Timer
 import kotlin.math.pow
 
+/**
+ * LinuxVideoPlayerState class serves as the platform-specific implementation of a video player state
+ * for Linux systems using GStreamer. It provides video playback functionality, including control over
+ * playback state, volume, looping, and timeline navigation.
+ *
+ * This class interacts with the GStreamer framework, managing media playback through the `PlayBin`
+ * mechanism with a custom GStreamer video component for video output. It utilizes a timer to
+ * periodically update playback positions and durations, synchronizing the playback UI.
+ *
+ * Key functionalities:
+ * - Playback controls (play, pause, stop, seek).
+ * - Volume control with values clamped between 0.0 and 1.0.
+ * - Loop functionality to restart playback upon reaching the end.
+ * - Monitoring audio peaks to visualize left and right channel levels.
+ * - Updating playback position and duration texts based on media state.
+ * - Proper resource cleanup during disposal to ensure deinitialization of GStreamer components.
+ *
+ * The class is designed to be used within Compose or Jetpack Compose-based applications for rendering
+ * video playback surfaces on Linux platforms.
+ *
+ * Note:
+ * - GStreamer initialization occurs during the class instance creation.
+ * - Audio and video configurations, such as setting filters and event connections, are handled internally.
+ * - This class should be disposed of correctly to release allocated resources.
+ */
 @Stable
 class LinuxVideoPlayerState : PlatformVideoPlayerState {
 

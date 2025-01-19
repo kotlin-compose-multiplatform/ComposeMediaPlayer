@@ -11,6 +11,14 @@ import javafx.scene.Scene
 import javafx.scene.layout.StackPane
 import javafx.scene.media.MediaView
 
+/**
+ * Composable function for rendering a JavaFX-based video player surface.
+ * Utilizes a SwingPanel to embed JavaFX content within a Compose application.
+ *
+ * @param playerState An instance of JavaFxVideoPlayerState used to manage the state
+ *                    and functionality of the video player.
+ * @param modifier    A Modifier to specify layout and styling for the video player container.
+ */
 @Composable
 fun JavaFxVideoPlayerSurface(
     playerState: JavaFxVideoPlayerState,

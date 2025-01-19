@@ -1,71 +1,63 @@
 package io.github.kdroidfilter.composemediaplayer.javafx
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import javafx.application.Platform
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
 import javafx.scene.media.MediaView
 import javafx.util.Duration
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 
-data class MediaState(
-    val currentTime: Double = 0.0,
-    val duration: Double = 0.0,
-    val isPlaying: Boolean = false,
-    val hasMedia: Boolean = false,
-    val volume: Double = 1.0
-)
-
+// JavaFX Video Player State implementation
 class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private var currentMediaView: MediaView? = null
     internal var mediaPlayer: MediaPlayer? = null
 
-    private val _mediaState = MutableStateFlow(MediaState())
-    val mediaState: StateFlow<MediaState> = _mediaState.asStateFlow()
-
-    // Override from VideoPlayerState
-    override val isPlaying: Boolean
-        get() = _mediaState.value.isPlaying
-
+    // Compose states with backing properties for custom logic
+    private var _volume by mutableStateOf(1f)
     override var volume: Float
-        get() = _mediaState.value.volume.toFloat()
+        get() = _volume
         set(value) {
-            val clampedVolume = value.coerceIn(0.0f..1.0f)
-            mediaPlayer?.volume = clampedVolume.toDouble()
-            updateState { it.copy(volume = clampedVolume.toDouble()) }
+            _volume = value.coerceIn(0f, 1f) // Ensure volume stays within bounds
+            mediaPlayer?.volume = _volume.toDouble()
         }
 
-    override var sliderPos: Float = 0f
-        get() = if (_mediaState.value.duration > 0)
-            (_mediaState.value.currentTime / _mediaState.value.duration).toFloat()
-        else 0f
+    private var _sliderPos by mutableStateOf(0f)
+    override var sliderPos: Float
+        get() = _sliderPos
         set(value) {
-            field = value
+            _sliderPos = value
             if (!userDragging) {
-                seekToPercent(value * 100.0)
+                seekTo(value)
             }
         }
 
-    override var userDragging: Boolean = false
-
-    override var loop: Boolean = false
+    private var _loop by mutableStateOf(false)
+    override var loop: Boolean
+        get() = _loop
         set(value) {
-            field = value
-            mediaPlayer?.cycleCount = if (value) MediaPlayer.INDEFINITE else 1
+            _loop = value
+            mediaPlayer?.cycleCount = if (value) MediaPlayer.INDEFINITE else 1 // Loop setting
         }
 
-    // Audio levels - JavaFX doesn't provide direct audio level monitoring
-    override val leftLevel: Float = 0f
-    override val rightLevel: Float = 0f
+    override var userDragging by mutableStateOf(false)
+    private var _isPlaying by mutableStateOf(false)
+    override val isPlaying: Boolean get() = _isPlaying
 
-    override val positionText: String
-        get() = formatTime(_mediaState.value.currentTime)
+    private var _leftLevel by mutableStateOf(0f)
+    private var _rightLevel by mutableStateOf(0f)
+    override val leftLevel: Float get() = _leftLevel
+    override val rightLevel: Float get() = _rightLevel
 
-    override val durationText: String
-        get() = formatTime(_mediaState.value.duration)
+    private var _currentTime by mutableStateOf(0.0)
+    private var _duration by mutableStateOf(0.0)
+    override val positionText: String get() = formatTime(_currentTime)
+    override val durationText: String get() = formatTime(_duration)
 
+    // Updates the MediaView with the current MediaPlayer
     fun updateMediaView(view: MediaView) {
         currentMediaView = view
         mediaPlayer?.let { player ->
@@ -75,6 +67,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+    // Opens the media file or URL and initializes the media player
     override fun openUri(uri: String) {
         stopMedia()
         val fileOrUrl = if (uri.startsWith("http")) uri else File(uri).toURI().toString()
@@ -82,112 +75,126 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         try {
             val media = Media(fileOrUrl)
             mediaPlayer = MediaPlayer(media).apply {
-                volume = _mediaState.value.volume
+                // Initial configuration
+                volume = _volume.toDouble()
                 cycleCount = if (loop) MediaPlayer.INDEFINITE else 1
 
+                // Configuring AudioSpectrum for audio levels
+                audioSpectrumInterval = 0.05
+                audioSpectrumThreshold = -60
+                audioSpectrumNumBands = 2
+
+                setAudioSpectrumListener { _, _, magnitudes, _ ->
+                    val leftDb = magnitudes[0]
+                    val rightDb = if (magnitudes.size > 1) magnitudes[1] else magnitudes[0]
+
+                    val leftPercent = ((leftDb + 60) / 60 * 100).coerceIn(0.0F, 100.0F)
+                    val rightPercent = ((rightDb + 60) / 60 * 100).coerceIn(0.0F, 100.0F)
+
+                    // Update the audio levels on the UI thread
+                    Platform.runLater {
+                        _leftLevel = leftPercent
+                        _rightLevel = rightPercent
+                    }
+                }
+
+                // Listeners for time updates
                 currentTimeProperty().addListener { _, _, newValue ->
-                    updateState {
-                        it.copy(currentTime = newValue.toSeconds())
+                    _currentTime = newValue.toSeconds()
+                    if (!userDragging) {
+                        val duration = totalDuration?.toSeconds() ?: 0.0
+                        if (duration > 0) {
+                            _sliderPos = (_currentTime / duration * 1000).toFloat()
+                        }
                     }
                 }
 
                 totalDurationProperty().addListener { _, _, newValue ->
-                    updateState {
-                        it.copy(duration = newValue?.toSeconds() ?: 0.0)
-                    }
+                    _duration = newValue?.toSeconds() ?: 0.0
                 }
 
+                // Listeners for playback status
                 statusProperty().addListener { _, _, newStatus ->
-                    updateState {
-                        it.copy(
-                            isPlaying = newStatus == MediaPlayer.Status.PLAYING,
-                            hasMedia = true
-                        )
-                    }
+                    _isPlaying = newStatus == MediaPlayer.Status.PLAYING
                 }
 
                 setOnReady {
                     Platform.runLater {
                         currentMediaView?.mediaPlayer = this
-                        updateState {
-                            it.copy(
-                                duration = totalDuration?.toSeconds() ?: 0.0,
-                                hasMedia = true
-                            )
-                        }
+                        _duration = totalDuration?.toSeconds() ?: 0.0
                     }
                 }
 
                 setOnEndOfMedia {
                     if (!loop) {
-                        updateState {
-                            it.copy(isPlaying = false)
-                        }
+                        _isPlaying = false
                     }
                 }
 
                 setOnError {
                     println("MediaPlayer Error: ${error.message}")
                     error.printStackTrace()
-                    updateState {
-                        it.copy(hasMedia = false, isPlaying = false)
-                    }
+                    _isPlaying = false
                 }
             }
             play()
         } catch (e: Exception) {
             println("Error opening media: ${e.message}")
             e.printStackTrace()
-            updateState {
-                it.copy(hasMedia = false, isPlaying = false)
-            }
+            _isPlaying = false
         }
     }
 
+    // Starts playing the media
     override fun play() {
         mediaPlayer?.play()
-        updateState { it.copy(isPlaying = true) }
+        _isPlaying = true
     }
 
+    // Pauses the media
     override fun pause() {
         mediaPlayer?.pause()
-        updateState { it.copy(isPlaying = false) }
+        _isPlaying = false
     }
 
+    // Stops and disposes of the media player
     override fun stop() {
         stopMedia()
     }
 
+    // Seeks to a specific position in the media
     override fun seekTo(value: Float) {
-        seekToPercent(value * 100.0)
-    }
-
-    private fun stopMedia() {
-        mediaPlayer?.stop()
-        mediaPlayer?.dispose()
-        mediaPlayer = null
-        updateState {
-            MediaState()  // Reset to initial state
-        }
-    }
-
-    private fun seekToPercent(percent: Double) {
-        val duration = _mediaState.value.duration
-        if (duration > 0) {
-            val targetTime = (percent.coerceIn(0.0, 100.0) / 100.0) * duration
+        if (_duration > 0) {
+            val targetTime = (value / 1000.0) * _duration
             mediaPlayer?.seek(Duration.seconds(targetTime))
         }
     }
 
-    private fun updateState(update: (MediaState) -> MediaState) {
-        _mediaState.value = update(_mediaState.value)
+    // Stops and disposes of the media player, resetting states
+    private fun stopMedia() {
+        mediaPlayer?.stop()
+        mediaPlayer?.dispose()
+        mediaPlayer = null
+        resetStates()
     }
 
+    // Resets the player state
+    private fun resetStates() {
+        _isPlaying = false
+        _currentTime = 0.0
+        _duration = 0.0
+        _sliderPos = 0f
+        _leftLevel = 0f
+        _rightLevel = 0f
+    }
+
+    // Cleans up the media player and view
     override fun dispose() {
         stopMedia()
         currentMediaView = null
     }
 
+    // Formats time in HH:mm:ss or mm:ss format
     private fun formatTime(seconds: Double): String {
         val duration = java.time.Duration.ofSeconds(seconds.toLong())
         val hours = duration.toHours()

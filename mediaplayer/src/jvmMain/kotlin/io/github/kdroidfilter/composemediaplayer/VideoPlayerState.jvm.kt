@@ -5,25 +5,6 @@ import com.sun.jna.Platform
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 
-interface PlatformVideoPlayerState {
-    val isPlaying: Boolean
-    var volume: Float
-    var sliderPos: Float
-    var userDragging: Boolean
-    var loop: Boolean
-    val leftLevel: Float
-    val rightLevel: Float
-    val positionText: String
-    val durationText: String
-
-    fun openUri(uri: String)
-    fun play()
-    fun pause()
-    fun stop()
-    fun seekTo(value: Float)
-    fun dispose()
-}
-
 
 @Stable
 actual open class VideoPlayerState {
