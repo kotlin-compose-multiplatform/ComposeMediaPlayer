@@ -10,6 +10,7 @@ import javafx.scene.media.MediaPlayer
 import javafx.scene.media.MediaView
 import javafx.util.Duration
 import java.io.File
+import java.time.Duration.ofSeconds
 
 // JavaFX Video Player State implementation
 class JavaFxVideoPlayerState : PlatformVideoPlayerState {
@@ -196,7 +197,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
 
     // Formats time in HH:mm:ss or mm:ss format
     private fun formatTime(seconds: Double): String {
-        val duration = java.time.Duration.ofSeconds(seconds.toLong())
+        val duration = ofSeconds(seconds.toLong())
         val hours = duration.toHours()
         val minutes = duration.toMinutesPart()
         val secs = duration.toSecondsPart()

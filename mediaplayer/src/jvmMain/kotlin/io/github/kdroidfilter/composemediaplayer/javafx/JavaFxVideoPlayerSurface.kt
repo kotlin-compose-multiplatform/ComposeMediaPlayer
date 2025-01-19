@@ -41,11 +41,11 @@ fun JavaFxVideoPlayerSurface(
 
                     playerState.updateMediaView(mediaView)
 
-                    // Configuration du redimensionnement
+                    // Resize configuration
                     stackPane.children.add(mediaView)
                     StackPane.setAlignment(mediaView, Pos.CENTER)
 
-                    // Liaison bidirectionnelle pour le redimensionnement
+                    // Bidirectional binding for resizing
                     stackPane.widthProperty().addListener { _, _, newWidth ->
                         mediaView.fitWidth = newWidth.toDouble()
                     }
@@ -53,7 +53,7 @@ fun JavaFxVideoPlayerSurface(
                         mediaView.fitHeight = newHeight.toDouble()
                     }
 
-                    // Gestion du redimensionnement de la fenêtre
+                    // Handling window resizing
                     scene.windowProperty().addListener { _, _, newWindow ->
                         if (newWindow != null) {
                             newWindow.widthProperty().addListener { _, _, _ ->
