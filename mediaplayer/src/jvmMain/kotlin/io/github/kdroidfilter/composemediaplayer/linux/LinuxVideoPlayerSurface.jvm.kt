@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer
+package io.github.kdroidfilter.composemediaplayer.linux
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +19,8 @@ import androidx.compose.ui.awt.SwingPanel
  */
 
 @Composable
-actual fun VideoPlayerSurface(
-    playerState: VideoPlayerState,
+fun LinuxVideoPlayerSurface(
+    playerState: LinuxVideoPlayerState,
     modifier: Modifier,
 ) {
     Box(modifier = modifier) {

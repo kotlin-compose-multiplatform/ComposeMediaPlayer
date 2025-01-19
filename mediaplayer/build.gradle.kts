@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import java.util.*
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -13,6 +14,19 @@ plugins {
 group = "io.github.kdroidfilter.composemediaplayer"
 version = "0.0.1"
 
+val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
+
+val fxClassifier = when {
+    osName.contains("linux") && osArch.contains("aarch64") -> "linux-aarch64"
+    osName.contains("linux") -> "linux"
+    osName.contains("windows") -> "win"
+    osName.contains("mac") && osArch.contains("aarch64") -> "mac-aarch64"
+    osName.contains("mac") -> "mac"
+    else -> throw IllegalStateException("Unsupported OS: $osName")
+}
+
+val javafxVersion = 21
 
 kotlin {
     jvmToolchain(17)
@@ -48,8 +62,11 @@ kotlin {
             implementation(libs.gst1.java.swing)
             implementation(libs.jna)
             implementation(libs.jna.platform)
-            implementation ("org.openjfx:javafx-controls:17.0.1")
-            implementation ("org.openjfx:javafx-media:17.0.1")
+
+            implementation("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
+            implementation("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
+            implementation("org.openjfx:javafx-swing:${javafxVersion}:${fxClassifier}")
+            implementation("org.openjfx:javafx-media:${javafxVersion}:${fxClassifier}")
         }
 
         iosMain.dependencies {

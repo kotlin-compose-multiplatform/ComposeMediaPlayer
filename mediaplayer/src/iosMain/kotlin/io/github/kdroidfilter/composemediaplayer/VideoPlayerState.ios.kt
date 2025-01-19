@@ -3,7 +3,7 @@ package io.github.kdroidfilter.composemediaplayer
 import androidx.compose.runtime.Stable
 
 @Stable
-actual class VideoPlayerState {
+actual open class VideoPlayerState {
     //TODO
 
     actual val isPlaying: Boolean = false

@@ -48,7 +48,6 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.jna)
             implementation(libs.jna.platform)
-            implementation(project(":gstreamer-windows"))
 
         }
 

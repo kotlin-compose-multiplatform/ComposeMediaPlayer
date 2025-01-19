@@ -6,7 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 
 @Stable
-expect class VideoPlayerState() {
+expect open class VideoPlayerState() {
     val isPlaying: Boolean
     var volume: Float
 
@@ -18,7 +18,7 @@ expect class VideoPlayerState() {
     val positionText: String
     val durationText: String
 
-    fun openUri(uri: Any)
+    fun openUri(uri: String)
     fun play()
     fun pause()
     fun stop()
