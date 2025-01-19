@@ -16,7 +16,7 @@ actual open class VideoPlayerState {
     actual val positionText: String = "00:00"
     actual val durationText: String = "00:00"
 
-    actual fun openUri(uri: Any) {
+    actual fun openUri(uri: String) {
     }
 
     actual fun play() {

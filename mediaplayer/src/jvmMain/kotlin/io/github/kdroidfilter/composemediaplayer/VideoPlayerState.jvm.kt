@@ -6,6 +6,34 @@ import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 
 
+/**
+ * Represents the state and behavior of a video player. This class provides properties
+ * and methods to control video playback, manage the playback state, and interact with
+ * platform-specific implementations.
+ *
+ * The actual implementation delegates its behavior to platform-specific video player
+ * states based on the detected operating system. Supported platforms include Windows,
+ * macOS, and Linux.
+ *
+ * Properties:
+ * - `isPlaying`: Indicates whether the video is currently playing.
+ * - `volume`: Controls the playback volume. Valid values are within the range of 0.0 (muted) to 1.0 (maximum volume).
+ * - `sliderPos`: Represents the current playback position as a normalized value between 0.0 and 1.0.
+ * - `userDragging`: Denotes whether the user is manually adjusting the playback position.
+ * - `loop`: Specifies if the video should loop when it reaches the end.
+ * - `leftLevel`: Provides the audio level for the left channel as a percentage.
+ * - `rightLevel`: Provides the audio level for the right channel as a percentage.
+ * - `positionText`: Returns the current playback position as a formatted string.
+ * - `durationText`: Returns the total duration of the video as a formatted string.
+ *
+ * Methods:
+ * - `openUri(uri: String)`: Opens a video file or URL for playback.
+ * - `play()`: Starts or resumes video playback.
+ * - `pause()`: Pauses video playback.
+ * - `stop()`: Stops playback and resets the player state.
+ * - `seekTo(value: Float)`: Seeks to a specific playback position based on the provided normalized value.
+ * - `dispose()`: Releases resources used by the video player and disposes of the state.
+ */
 @Stable
 actual open class VideoPlayerState {
     val delegate: PlatformVideoPlayerState = when {

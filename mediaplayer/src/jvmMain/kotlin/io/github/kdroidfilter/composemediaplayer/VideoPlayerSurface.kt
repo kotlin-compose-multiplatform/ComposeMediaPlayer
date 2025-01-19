@@ -7,6 +7,16 @@ import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerSurface
 
+/**
+ * Composable function for rendering a video player surface.
+ *
+ * The function delegates the rendering logic to specific platform-specific implementations
+ * based on the type of the `delegate` within the provided `VideoPlayerState`.
+ *
+ * @param playerState The current state of the video player, encapsulating playback state
+ *                    and platform-specific implementation details.
+ * @param modifier A [Modifier] for styling or adjusting the layout of the video player surface.
+ */
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
     when (val delegate = playerState.delegate) {
