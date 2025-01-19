@@ -36,6 +36,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(project(":mediaplayer"))
+
             implementation(libs.filekit.compose)
         }
 
@@ -45,6 +46,10 @@ kotlin {
 
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
+            implementation(libs.jna)
+            implementation(libs.jna.platform)
+            implementation(project(":gstreamer-windows"))
+
         }
 
     }

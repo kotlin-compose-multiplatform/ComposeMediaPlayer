@@ -1,6 +1,7 @@
 package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.*
+import io.github.kdroidfilter.composemediaplayer.linux.GStreamerInit
 import org.freedesktop.gstreamer.*
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags

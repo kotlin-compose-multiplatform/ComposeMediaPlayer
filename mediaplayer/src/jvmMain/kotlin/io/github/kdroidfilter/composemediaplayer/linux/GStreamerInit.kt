@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer
+package io.github.kdroidfilter.composemediaplayer.linux
 
 import com.sun.jna.Platform
 import com.sun.jna.platform.win32.Kernel32

@@ -48,6 +48,8 @@ kotlin {
             implementation(libs.gst1.java.swing)
             implementation(libs.jna)
             implementation(libs.jna.platform)
+            implementation ("org.openjfx:javafx-controls:17.0.1")
+            implementation ("org.openjfx:javafx-media:17.0.1")
         }
 
         iosMain.dependencies {
