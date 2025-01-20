@@ -25,8 +25,7 @@ dependencies {
 ```
 
 ### Note:
-Currently, you also need to manually include JavaFX dependencies for your platform as described in the [Known Issues](#⚠️-Known-Issues) section. A patch is being developed to address this requirement.
-
+Currently, you also need to manually include JavaFX dependencies for your platform as described in the [Known Issues](https://github.com/kdroidFilter/Compose-Media-Player?tab=readme-ov-file#%EF%B8%8F-known-issues) section. A patch is being developed to address this requirement.
 
 ## 🚀 Getting Started
 
