@@ -91,10 +91,6 @@ See the example above for more details.
 
 Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
----
-
-For contributions, issues, or feature requests, visit the [GitHub repository](https://github.com/your-repo/compose-media-player).
-
 ## 📊 Roadmap
 
 - **iOS and WebAssembly (WasmJS) Support**: Expand support to additional platforms to enhance compatibility.
