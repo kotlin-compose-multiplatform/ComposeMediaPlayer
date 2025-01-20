@@ -59,9 +59,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     // region: Declaration of @Composable states
 
     private var _sliderPos by mutableStateOf(0f)
+
     override var sliderPos: Float
         get() = _sliderPos
         set(value) { _sliderPos = value }
+
+    private var targetSeekPos: Float = 0f
 
     private var _userDragging by mutableStateOf(false)
     override var userDragging: Boolean
@@ -149,11 +152,24 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 val pos = playbin.queryPosition(Format.TIME)
                 if (dur > 0) {
                     val relPos = pos.toDouble() / dur.toDouble()
-                    _sliderPos = (relPos * 1000.0).toFloat()
-                }
-                EventQueue.invokeLater {
-                    _positionText = formatTimeNs(pos)
-                    _durationText = formatTimeNs(dur)
+                    val currentSliderPos = (relPos * 1000.0).toFloat()
+
+                    if (targetSeekPos > 0f) {
+                        if (kotlin.math.abs(targetSeekPos - currentSliderPos) < 1f) {
+                            _sliderPos = currentSliderPos
+                            targetSeekPos = 0f
+                        }
+                    } else {
+                        _sliderPos = currentSliderPos
+                    }
+
+                    // Only update position text if we're not seeking or if the position is valid
+                    if (pos > 0) {
+                        EventQueue.invokeLater {
+                            _positionText = formatTimeNs(pos)
+                            _durationText = formatTimeNs(dur)
+                        }
+                    }
                 }
             }
         }
@@ -213,9 +229,23 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override fun seekTo(value: Float) {
         val dur = playbin.queryDuration(Format.TIME)
         if (dur > 0) {
+            // Immediately update the slider position
+            _sliderPos = value
+            targetSeekPos = value
+
             val relPos = value / 1000f
             val seekPos = (relPos * dur.toDouble()).toLong()
-            playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH), seekPos)
+
+            // Update the position text before seeking
+            _positionText = formatTimeNs(seekPos)
+
+            // Perform the seek operation
+            playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE), seekPos)
+
+            // Force an immediate position update
+            EventQueue.invokeLater {
+                _positionText = formatTimeNs(seekPos)
+            }
         }
     }
 
