@@ -20,11 +20,9 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:<latest_version>")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.1.0")
 }
 ```
-
-Replace `<latest_version>` with the latest version available on [Maven Central](https://search.maven.org/).
 
 ## 🚀 Getting Started
 
@@ -97,7 +95,7 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 - **Audio Player**: Introduce a standalone audio player for handling audio-only content.
 - **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
 
-## 🟎️ ScreenShots
+## 🟎️ Screenshots of the Demo App
 
 ### Windows
 ![Windows Sample](assets/screenshots/windows_sample.png)
