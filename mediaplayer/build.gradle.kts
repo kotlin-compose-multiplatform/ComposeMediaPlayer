@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose)
-
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
@@ -27,6 +26,9 @@ val fxClassifier = when {
 }
 
 val javafxVersion = 21
+
+
+
 
 kotlin {
     jvmToolchain(17)
@@ -53,6 +55,8 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidcontextprovider)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.androidx.media3.ui)
 
         }
 
@@ -92,4 +96,8 @@ android {
     defaultConfig {
         minSdk = 21
     }
+}
+
+tasks.withType<JavaExec> {
+    jvmArgs = listOf("--add-modules", "javafx.controls,javafx.fxml", "--add-opens", "javafx.graphics/javafx.scene=ALL-UNNAMED", "--add-opens", "javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED", "--add-opens", "javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED")
 }

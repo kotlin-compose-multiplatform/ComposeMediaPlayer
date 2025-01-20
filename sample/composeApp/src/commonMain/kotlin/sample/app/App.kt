@@ -40,7 +40,7 @@ fun App() {
         modifier = Modifier.fillMaxSize().background(Color.White),
         contentAlignment = Alignment.Center
     ) {
-        var url by remember { mutableStateOf("https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4") }
+        var url by remember { mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }
 
         MaterialTheme {
             val playerState = rememberVideoPlayerState()
