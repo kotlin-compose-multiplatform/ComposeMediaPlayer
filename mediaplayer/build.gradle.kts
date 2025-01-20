@@ -27,7 +27,7 @@ val fxClassifier = when {
     else -> throw IllegalStateException("Unsupported OS: $osName")
 }
 
-val javafxVersion = 21
+val javafxVersion = "22.0.1"
 
 kotlin {
     jvmToolchain(17)
