@@ -97,6 +97,17 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 - **Audio Player**: Introduce a standalone audio player for handling audio-only content.
 - **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
 
+## 🟎️ ScreenShots
+
+### Windows
+![Windows Sample](assets/screenshots/windows_sample.png)
+
+### Linux
+![Linux Sample](assets/screenshots/linux_sample.png)
+
+### Android
+![Android Sample](assets/screenshots/android_sample.png)
+
 ## ⚠️ Known Issues
 
 - **JavaFX Warning on macOS and Windows**: A warning message may appear during runtime:
@@ -107,4 +118,3 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
   ```
 
   This warning does not appear to cause any functional issues but is under investigation.
-
