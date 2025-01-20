@@ -1,7 +1,7 @@
 package io.github.kdroidfilter.composemediaplayer.windows
 
 /**
- * Constants pour MFPlayer
+ * Constants for MFPlayer
  */
 object MFPConstants {
     // Player States

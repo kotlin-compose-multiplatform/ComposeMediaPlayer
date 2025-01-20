@@ -35,14 +35,12 @@ class MediaPlayerExample : JFrame("MFPlayer Example - kdroidFilter") {
 
     private val callback = object : MFPlayerLibrary.IMFPCallback {
         override fun invoke(pEvent: Pointer?): Int {
-            // Ici vous pouvez traiter les événements du lecteur
-            // Par exemple, mettre à jour l'interface lorsque le média est prêt
             SwingUtilities.invokeLater {
                 try {
                     val (videoSize, _) = player?.getNativeVideoSize() ?: return@invokeLater
                     updateStatus("Video loaded - Size: ${videoSize.cx}x${videoSize.cy}")
                 } catch (e: Exception) {
-                    // Ignorer l'erreur si la vidéo n'est pas encore prête
+                    // Ignore the error if the video is not ready yet
                 }
             }
             return 0

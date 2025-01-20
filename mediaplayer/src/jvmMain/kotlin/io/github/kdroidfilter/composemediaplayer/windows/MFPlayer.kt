@@ -6,7 +6,7 @@ import com.sun.jna.ptr.PointerByReference
 import java.io.Closeable
 
 /**
- * Classe wrapper pour une utilisation plus simple de MFPlayer
+ * Wrapper class for easier use of MFPlayer
  */
 class MFPlayer private constructor(private val player: Pointer) : Closeable {
     companion object {
