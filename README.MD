@@ -95,3 +95,20 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 
 For contributions, issues, or feature requests, visit the [GitHub repository](https://github.com/your-repo/compose-media-player).
 
+## 📊 Roadmap
+
+- **iOS and WebAssembly (WasmJS) Support**: Expand support to additional platforms to enhance compatibility.
+- **Audio Player**: Introduce a standalone audio player for handling audio-only content.
+- **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
+
+## ⚠️ Known Issues
+
+- **JavaFX Warning on macOS and Windows**: A warning message may appear during runtime:
+
+  ```
+  Jan 20, 2025 7:24:02 AM com.sun.javafx.application.PlatformImpl startup
+  WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @367d4c06'
+  ```
+
+  This warning does not appear to cause any functional issues but is under investigation.
+
