@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
-version = "0.1.0"
+version = "0.1.1"
 
 val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
 val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
