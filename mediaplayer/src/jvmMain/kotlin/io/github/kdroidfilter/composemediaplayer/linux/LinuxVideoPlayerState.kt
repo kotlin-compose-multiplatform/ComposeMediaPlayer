@@ -86,6 +86,10 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val isLoading: Boolean
         get() = _isLoading
 
+    private var _isPlaying by mutableStateOf(false)
+    override val isPlaying: Boolean
+        get() = _isPlaying
+
     private var _error by mutableStateOf<VideoPlayerError?>(null)
     override val error: VideoPlayerError?
         get() = _error
@@ -106,6 +110,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                     } else {
                         stop()
                     }
+                    _isPlaying = loop // Met à jour l'état en fonction du mode boucle
                 }
             }
         })
@@ -131,10 +136,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         })
 
         playbin.bus.connect(object : Bus.STATE_CHANGED {
-            override fun stateChanged(source: GstObject, old: org.freedesktop.gstreamer.State,
+            override fun stateChanged(source: GstObject,
+                                      old: org.freedesktop.gstreamer.State,
                                       current: org.freedesktop.gstreamer.State,
                                       pending: org.freedesktop.gstreamer.State) {
                 EventQueue.invokeLater {
+                    _isPlaying = current == org.freedesktop.gstreamer.State.PLAYING
                     _isLoading = when (current) {
                         org.freedesktop.gstreamer.State.READY,
                         org.freedesktop.gstreamer.State.PAUSED -> true
@@ -214,11 +221,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    override val isPlaying: Boolean
-        get() = playbin.isPlaying
-
     override fun openUri(uri: String) {
-        stop()
+        stop() // Ceci mettra aussi _isPlaying à false
         clearError()
         _isLoading = true
 
@@ -229,25 +233,39 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 File(uri).toURI()
             }
             playbin.setURI(uri)
-            play()
+            play() // Ceci mettra _isPlaying à true si succès
         } catch (e: Exception) {
             _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
             _isLoading = false
+            _isPlaying = false
             e.printStackTrace()
         }
     }
 
     override fun play() {
-        playbin.play()
-        playbin.set("volume", volume.toDouble())
+        try {
+            playbin.play()
+            playbin.set("volume", volume.toDouble())
+            _isPlaying = true
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Failed to play: ${e.message}")
+            _isPlaying = false
+        }
     }
 
+
     override fun pause() {
-        playbin.pause()
+        try {
+            playbin.pause()
+            _isPlaying = false
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Failed to pause: ${e.message}")
+        }
     }
 
     override fun stop() {
         playbin.stop()
+        _isPlaying = false
         _sliderPos = 0f
         _positionText = "0:00"
         _isLoading = false
