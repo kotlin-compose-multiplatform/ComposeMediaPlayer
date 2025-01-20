@@ -24,6 +24,10 @@ dependencies {
 }
 ```
 
+### Note:
+Currently, you also need to manually include JavaFX dependencies for your platform as described in the [Known Issues](#⚠️-Known-Issues) section. A patch is being developed to address this requirement.
+
+
 ## 🚀 Getting Started
 
 ### 📋 Basic Example
@@ -146,3 +150,5 @@ implementation("org.openjfx:javafx-media:\${javafxVersion}:<fxClassifier>")
   ```
 
 This warning does not appear to cause any functional issues but is under investigation.
+
+
