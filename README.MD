@@ -97,7 +97,7 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 - **Audio Player**: Introduce a standalone audio player for handling audio-only content.
 - **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
 
-## 🟎️ ScreenShots
+## 🟎️ Screenshots of the Demo App
 
 ### Windows
 ![Windows Sample](assets/screenshots/windows_sample.png)
