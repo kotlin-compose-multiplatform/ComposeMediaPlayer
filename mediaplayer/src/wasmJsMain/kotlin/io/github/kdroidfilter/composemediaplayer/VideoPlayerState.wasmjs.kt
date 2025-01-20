@@ -15,6 +15,8 @@ actual open class VideoPlayerState {
     actual val rightLevel: Float = 0.0f
     actual val positionText: String = "00:00"
     actual val durationText: String = "00:00"
+    actual val isLoading = false
+    actual  val error: VideoPlayerError? = null
 
     actual fun openUri(uri: String) {
     }
@@ -33,4 +35,6 @@ actual open class VideoPlayerState {
 
     actual fun dispose() {
     }
+
+    actual fun clearError() {}
 }

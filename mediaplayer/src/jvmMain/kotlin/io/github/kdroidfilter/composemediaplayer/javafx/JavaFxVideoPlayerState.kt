@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import javafx.application.Platform
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
@@ -14,7 +15,7 @@ import java.time.Duration.ofSeconds
 
 class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private var currentMediaView: MediaView? = null
-    var mediaPlayer: MediaPlayer? = null
+    internal var mediaPlayer: MediaPlayer? = null
 
     // Basic states
     private var _volume by mutableStateOf(1f)
@@ -25,6 +26,8 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private var _rightLevel by mutableStateOf(0f)
     private var _currentTime by mutableStateOf(0.0)
     private var _duration by mutableStateOf(0.0)
+    private var _isLoading by mutableStateOf(false)
+    private var _error by mutableStateOf<VideoPlayerError?>(null)
     override var userDragging by mutableStateOf(false)
 
     // Public properties with getters and setters
@@ -57,6 +60,8 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override val rightLevel: Float get() = _rightLevel
     override val positionText: String get() = formatTime(_currentTime)
     override val durationText: String get() = formatTime(_duration)
+    override val isLoading: Boolean get() = _isLoading
+    override val error: VideoPlayerError? get() = _error
 
     // Main function to update the MediaView
     fun updateMediaView(view: MediaView) {
@@ -72,6 +77,9 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override fun openUri(uri: String) {
         runOnFxThread {
             try {
+                _isLoading = true
+                _error = null
+
                 // Stop the current media
                 stopMedia()
 
@@ -141,6 +149,10 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+    override fun clearError() {
+        _error = null
+    }
+
     // Helper private functions
     private fun setupMediaPlayer(player: MediaPlayer) {
         with(player) {
@@ -189,7 +201,39 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private fun setupStatusListener(player: MediaPlayer) {
         player.statusProperty().addListener { _, _, newStatus ->
             println("Player status: $newStatus")
-            _isPlaying = newStatus == MediaPlayer.Status.PLAYING
+            when (newStatus) {
+                MediaPlayer.Status.PLAYING -> {
+                    _isPlaying = true
+                    _isLoading = false
+                }
+                MediaPlayer.Status.PAUSED -> {
+                    _isPlaying = false
+                    _isLoading = false
+                }
+                MediaPlayer.Status.STOPPED -> {
+                    _isPlaying = false
+                    _isLoading = false
+                }
+                MediaPlayer.Status.STALLED -> {
+                    _isLoading = true
+                }
+                MediaPlayer.Status.UNKNOWN -> {
+                    _isLoading = true
+                    _isPlaying = false
+                }
+                MediaPlayer.Status.READY -> {
+                    _isLoading = false
+                }
+                MediaPlayer.Status.HALTED -> {
+                    _isPlaying = false
+                    _isLoading = false
+                    handleError("Player halted", null)
+                }
+                MediaPlayer.Status.DISPOSED -> {
+                    _isPlaying = false
+                    _isLoading = false
+                }
+            }
         }
     }
 
@@ -197,6 +241,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         player.setOnReady {
             println("Player ready")
             _duration = player.totalDuration?.toSeconds() ?: 0.0
+            _isLoading = false
             player.play()
         }
 
@@ -223,6 +268,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
                 mediaPlayer = null
                 currentMediaView?.mediaPlayer = null
                 resetStates()
+                _error = null
                 println("Media stopped successfully")
             } catch (e: Exception) {
                 handleError("Error stopping media", e)
@@ -237,6 +283,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         _sliderPos = 0f
         _leftLevel = 0f
         _rightLevel = 0f
+        _isLoading = false
     }
 
     private fun updateVolume() {
@@ -262,6 +309,23 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         println("$message: ${error?.message}")
         error?.printStackTrace()
         _isPlaying = false
+        _isLoading = false
+
+        _error = when {
+            error?.message?.contains("codec", ignoreCase = true) == true ->
+                VideoPlayerError.CodecError(error.message ?: message)
+
+            error?.message?.contains("network", ignoreCase = true) == true ||
+                    error?.message?.contains("connection", ignoreCase = true) == true ->
+                VideoPlayerError.NetworkError(error.message ?: message)
+
+            error?.message?.contains("source", ignoreCase = true) == true ||
+                    error?.message?.contains("file", ignoreCase = true) == true ||
+                    error?.message?.contains("uri", ignoreCase = true) == true ->
+                VideoPlayerError.SourceError(error.message ?: message)
+
+            else -> VideoPlayerError.UnknownError(error?.message ?: message)
+        }
     }
 
     private fun formatTime(seconds: Double): String {

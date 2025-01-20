@@ -36,7 +36,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(project(":mediaplayer"))
-
+            implementation(compose.materialIconsExtended)
             implementation(libs.filekit.compose)
         }
 

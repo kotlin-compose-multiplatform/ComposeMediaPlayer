@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 expect open class VideoPlayerState() {
     val isPlaying: Boolean
     var volume: Float
-
     var sliderPos: Float
     var userDragging: Boolean
     var loop: Boolean
@@ -28,6 +27,8 @@ expect open class VideoPlayerState() {
     val rightLevel: Float
     val positionText: String
     val durationText: String
+    val isLoading: Boolean
+    val error: VideoPlayerError?
 
     fun openUri(uri: String)
     fun play()
@@ -35,7 +36,7 @@ expect open class VideoPlayerState() {
     fun stop()
     fun seekTo(value: Float)
     fun dispose()
-
+    fun clearError()
 }
 
 /**

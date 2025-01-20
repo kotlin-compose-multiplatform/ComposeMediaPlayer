@@ -43,6 +43,8 @@ actual open class VideoPlayerState {
     }
 
     actual open val isPlaying: Boolean get() = delegate.isPlaying
+    actual open val isLoading: Boolean get() = delegate.isLoading
+    actual open val error: VideoPlayerError? get() = delegate.error
     actual open var volume: Float
         get() = delegate.volume
         set(value) { delegate.volume = value }
@@ -66,4 +68,5 @@ actual open class VideoPlayerState {
     actual open fun stop() = delegate.stop()
     actual open fun seekTo(value: Float) = delegate.seekTo(value)
     actual open fun dispose() = delegate.dispose()
+    actual open fun clearError() = delegate.clearError()
 }

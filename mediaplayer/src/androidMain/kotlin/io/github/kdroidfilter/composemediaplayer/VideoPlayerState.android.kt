@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
@@ -29,6 +30,16 @@ actual open class VideoPlayerState {
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val audioProcessor = AudioLevelProcessor()
 
+    // State properties
+    private var _isPlaying by mutableStateOf(false)
+    actual val isPlaying: Boolean get() = _isPlaying
+
+    private var _isLoading by mutableStateOf(false)
+    actual val isLoading: Boolean get() = _isLoading
+
+    private var _error by mutableStateOf<VideoPlayerError?>(null)
+    actual val error: VideoPlayerError? get() = _error
+
     // Volume control
     private var _volume by mutableStateOf(1f)
     actual var volume: Float
@@ -49,6 +60,9 @@ actual open class VideoPlayerState {
             }
         }
 
+    // User interaction states
+    actual var userDragging by mutableStateOf(false)
+
     // Loop control
     private var _loop by mutableStateOf(false)
     actual var loop: Boolean
@@ -57,11 +71,6 @@ actual open class VideoPlayerState {
             _loop = value
             exoPlayer?.repeatMode = if (value) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         }
-
-    // State variables
-    actual var userDragging by mutableStateOf(false)
-    private var _isPlaying by mutableStateOf(false)
-    actual val isPlaying: Boolean get() = _isPlaying
 
     // Audio levels
     private var _leftLevel by mutableStateOf(0f)
@@ -93,9 +102,7 @@ actual open class VideoPlayerState {
                 context: Context,
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean
-            ): AudioSink? {
-                return audioSink
-            }
+            ): AudioSink = audioSink
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         exoPlayer = ExoPlayer.Builder(context)
@@ -110,7 +117,11 @@ actual open class VideoPlayerState {
     private fun createPlayerListener() = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
+                Player.STATE_BUFFERING -> {
+                    _isLoading = true
+                }
                 Player.STATE_READY -> {
+                    _isLoading = false
                     exoPlayer?.let { player ->
                         _duration = player.duration.toDouble() / 1000.0
                         _isPlaying = player.isPlaying
@@ -118,11 +129,12 @@ actual open class VideoPlayerState {
                     }
                 }
                 Player.STATE_ENDED -> {
+                    _isLoading = false
                     stopPositionUpdates()
                     _isPlaying = false
                 }
-                Player.STATE_IDLE, Player.STATE_BUFFERING -> {
-                    // Handle other states if needed
+                Player.STATE_IDLE -> {
+                    _isLoading = false
                 }
             }
         }
@@ -134,6 +146,22 @@ actual open class VideoPlayerState {
             } else {
                 stopPositionUpdates()
             }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            _error = when (error.errorCode) {
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ->
+                    VideoPlayerError.CodecError("Decoder initialization failed: ${error.message}")
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                    VideoPlayerError.NetworkError("Network error: ${error.message}")
+                PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE,
+                PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+                    VideoPlayerError.SourceError("Invalid media source: ${error.message}")
+                else -> VideoPlayerError.UnknownError("Playback error: ${error.message}")
+            }
+            _isPlaying = false
+            _isLoading = false
         }
     }
 
@@ -164,6 +192,7 @@ actual open class VideoPlayerState {
             player.stop()
             player.clearMediaItems()
             try {
+                _error = null
                 val mediaItem = MediaItem.fromUri(uri)
                 player.setMediaItem(mediaItem)
                 player.prepare()
@@ -173,6 +202,7 @@ actual open class VideoPlayerState {
             } catch (e: Exception) {
                 println("Error opening media: ${e.message}")
                 _isPlaying = false
+                _error = VideoPlayerError.SourceError("Failed to load media: ${e.message}")
             }
         }
     }
@@ -197,6 +227,10 @@ actual open class VideoPlayerState {
         }
     }
 
+    actual fun clearError() {
+        _error = null
+    }
+
     private fun resetStates() {
         _currentTime = 0.0
         _duration = 0.0
@@ -204,6 +238,8 @@ actual open class VideoPlayerState {
         _leftLevel = 0f
         _rightLevel = 0f
         _isPlaying = false
+        _isLoading = false
+        _error = null
     }
 
     actual fun dispose() {

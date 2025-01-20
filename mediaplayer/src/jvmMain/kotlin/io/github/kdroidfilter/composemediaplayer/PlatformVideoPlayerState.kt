@@ -36,6 +36,8 @@ interface PlatformVideoPlayerState {
     val rightLevel: Float
     val positionText: String
     val durationText: String
+    val isLoading: Boolean
+    val error: VideoPlayerError?
 
     fun openUri(uri: String)
     fun play()
@@ -43,4 +45,6 @@ interface PlatformVideoPlayerState {
     fun stop()
     fun seekTo(value: Float)
     fun dispose()
+    fun clearError()
+
 }

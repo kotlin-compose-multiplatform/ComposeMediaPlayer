@@ -5,10 +5,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import org.freedesktop.gstreamer.Bus
 import org.freedesktop.gstreamer.ElementFactory
 import org.freedesktop.gstreamer.Format
 import org.freedesktop.gstreamer.Gst
+import org.freedesktop.gstreamer.GstObject
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
 import org.freedesktop.gstreamer.swing.GstVideoComponent
@@ -24,25 +26,8 @@ import kotlin.math.pow
  * for Linux systems using GStreamer. It provides video playback functionality, including control over
  * playback state, volume, looping, and timeline navigation.
  *
- * This class interacts with the GStreamer framework, managing media playback through the `PlayBin`
- * mechanism with a custom GStreamer video component for video output. It utilizes a timer to
- * periodically update playback positions and durations, synchronizing the playback UI.
- *
- * Key functionalities:
- * - Playback controls (play, pause, stop, seek).
- * - Volume control with values clamped between 0.0 and 1.0.
- * - Loop functionality to restart playback upon reaching the end.
- * - Monitoring audio peaks to visualize left and right channel levels.
- * - Updating playback position and duration texts based on media state.
- * - Proper resource cleanup during disposal to ensure deinitialization of GStreamer components.
- *
- * The class is designed to be used within Compose or Jetpack Compose-based applications for rendering
- * video playback surfaces on Linux platforms.
- *
- * Note:
- * - GStreamer initialization occurs during the class instance creation.
- * - Audio and video configurations, such as setting filters and event connections, are handled internally.
- * - This class should be disposed of correctly to release allocated resources.
+ * @author kdroidFilter
+ * @since 2025-01-20
  */
 @Stable
 class LinuxVideoPlayerState : PlatformVideoPlayerState {
@@ -53,13 +38,10 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
     private val playbin = PlayBin("playbin")
     val gstVideoComponent = GstVideoComponent()
-
     private val sliderTimer = Timer(50, null)
 
-    // region: Declaration of @Composable states
-
+    // region: State declarations
     private var _sliderPos by mutableStateOf(0f)
-
     override var sliderPos: Float
         get() = _sliderPos
         set(value) { _sliderPos = value }
@@ -100,26 +82,70 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val durationText: String
         get() = _durationText
 
+    private var _isLoading by mutableStateOf(false)
+    override val isLoading: Boolean
+        get() = _isLoading
+
+    private var _error by mutableStateOf<VideoPlayerError?>(null)
+    override val error: VideoPlayerError?
+        get() = _error
     // endregion
 
     init {
-        // GStreamer configuration: level, bus, etc.
+        // GStreamer configuration
         val levelElement = ElementFactory.make("level", "level")
         playbin.set("audio-filter", levelElement)
         playbin.setVideoSink(gstVideoComponent.element)
 
-        // When playback reaches the end
-        playbin.bus.connect(Bus.EOS {
-            EventQueue.invokeLater {
-                if (loop) {
-                    playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH), 0)
-                } else {
+        // Bus event handlers
+        playbin.bus.connect(object : Bus.EOS {
+            override fun endOfStream(source: GstObject) {
+                EventQueue.invokeLater {
+                    if (loop) {
+                        playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH), 0)
+                    } else {
+                        stop()
+                    }
+                }
+            }
+        })
+
+        playbin.bus.connect(object : Bus.ERROR {
+            override fun errorMessage(source: GstObject, code: Int, message: String) {
+                EventQueue.invokeLater {
+                    _error = when {
+                        message.contains("codec") || message.contains("decode") ->
+                            VideoPlayerError.CodecError(message)
+                        message.contains("network") || message.contains("connection") ||
+                                message.contains("DNS") || message.contains("http") ->
+                            VideoPlayerError.NetworkError(message)
+                        message.contains("source") || message.contains("uri") ||
+                                message.contains("resource") ->
+                            VideoPlayerError.SourceError(message)
+                        else ->
+                            VideoPlayerError.UnknownError(message)
+                    }
                     stop()
                 }
             }
         })
 
-        // Retrieve the "peak" levels
+        playbin.bus.connect(object : Bus.STATE_CHANGED {
+            override fun stateChanged(source: GstObject, old: org.freedesktop.gstreamer.State,
+                                      current: org.freedesktop.gstreamer.State,
+                                      pending: org.freedesktop.gstreamer.State) {
+                EventQueue.invokeLater {
+                    _isLoading = when (current) {
+                        org.freedesktop.gstreamer.State.READY,
+                        org.freedesktop.gstreamer.State.PAUSED -> true
+                        org.freedesktop.gstreamer.State.PLAYING -> false
+                        else -> _isLoading
+                    }
+                }
+            }
+        })
+
+        // Audio level monitoring
         playbin.bus.connect("element") { _, message ->
             if (message.source == levelElement) {
                 val struct = message.structure
@@ -145,7 +171,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         }
 
-        // Timer to update position/duration
+        // Position/duration update timer
         sliderTimer.addActionListener {
             if (!userDragging) {
                 val dur = playbin.queryDuration(Format.TIME)
@@ -163,7 +189,6 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                         _sliderPos = currentSliderPos
                     }
 
-                    // Only update position text if we're not seeking or if the position is valid
                     if (pos > 0) {
                         EventQueue.invokeLater {
                             _positionText = formatTimeNs(pos)
@@ -192,31 +217,32 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val isPlaying: Boolean
         get() = playbin.isPlaying
 
-    // Common functions
-
     override fun openUri(uri: String) {
         stop()
+        clearError()
+        _isLoading = true
+
         try {
             val uri = if (uri.startsWith("http://") || uri.startsWith("https://")) {
                 URI(uri)
             } else {
-                // Convert the local file path to a file URI
                 File(uri).toURI()
             }
             playbin.setURI(uri)
             play()
         } catch (e: Exception) {
+            _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
+            _isLoading = false
             e.printStackTrace()
         }
     }
-
 
     override fun play() {
         playbin.play()
         playbin.set("volume", volume.toDouble())
     }
 
-     override fun pause() {
+    override fun pause() {
         playbin.pause()
     }
 
@@ -224,29 +250,29 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         playbin.stop()
         _sliderPos = 0f
         _positionText = "0:00"
+        _isLoading = false
     }
 
     override fun seekTo(value: Float) {
         val dur = playbin.queryDuration(Format.TIME)
         if (dur > 0) {
-            // Immediately update the slider position
             _sliderPos = value
             targetSeekPos = value
 
             val relPos = value / 1000f
             val seekPos = (relPos * dur.toDouble()).toLong()
-
-            // Update the position text before seeking
             _positionText = formatTimeNs(seekPos)
 
-            // Perform the seek operation
             playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE), seekPos)
 
-            // Force an immediate position update
             EventQueue.invokeLater {
                 _positionText = formatTimeNs(seekPos)
             }
         }
+    }
+
+    override fun clearError() {
+        _error = null
     }
 
     override fun dispose() {
