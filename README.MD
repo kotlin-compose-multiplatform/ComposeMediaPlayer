@@ -20,9 +20,12 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:0.1.0")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.1.1")
 }
 ```
+
+### Note:
+Currently, you also need to manually include JavaFX dependencies for your platform as described in the [Known Issues](https://github.com/kdroidFilter/Compose-Media-Player?tab=readme-ov-file#%EF%B8%8F-known-issues) section. A patch is being developed to address this requirement.
 
 ## 🚀 Getting Started
 
@@ -108,11 +111,43 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 
 ## ⚠️ Known Issues
 
-- **JavaFX Warning on macOS and Windows**: A warning message may appear during runtime:
+### Platform-Specific JavaFX Dependencies
+
+To use the Compose Media Player library, you must manually include the appropriate JavaFX dependencies for your operating system and architecture. This is due to the platform-specific nature of JavaFX. The classifier for your platform can be determined using the following logic:
+
+```kotlin
+val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
+val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
+
+val fxClassifier = when {
+    osName.contains("linux") && osArch.contains("aarch64") -> "linux-aarch64"
+    osName.contains("linux") -> "linux"
+    osName.contains("windows") -> "win"
+    osName.contains("mac") && osArch.contains("aarch64") -> "mac-aarch64"
+    osName.contains("mac") -> "mac"
+    else -> throw IllegalStateException("Unsupported OS: $osName")
+}
+
+val javafxVersion = "22.0.1"
+```
+
+#### JavaFX Dependencies
+After determining the correct classifier, include the following dependencies in your project. Ensure you are using JavaFX version `22.0.1`:
+
+```kotlin
+implementation("org.openjfx:javafx-base:\${javafxVersion}:<fxClassifier>")
+implementation("org.openjfx:javafx-graphics:\${javafxVersion}:<fxClassifier>")
+implementation("org.openjfx:javafx-swing:\${javafxVersion}:<fxClassifier>")
+implementation("org.openjfx:javafx-media:\${javafxVersion}:<fxClassifier>")
+```
+
+### JavaFX Warning on macOS and Windows: A warning message may appear during runtime:
 
   ```
   Jan 20, 2025 7:24:02 AM com.sun.javafx.application.PlatformImpl startup
   WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @367d4c06'
   ```
 
-  This warning does not appear to cause any functional issues but is under investigation.
+This warning does not appear to cause any functional issues but is under investigation.
+
+
