@@ -94,7 +94,3 @@ android {
         minSdk = 21
     }
 }
-
-tasks.withType<JavaExec> {
-    jvmArgs = listOf("--add-modules", "javafx.controls,javafx.fxml", "--add-opens", "javafx.graphics/javafx.scene=ALL-UNNAMED", "--add-opens", "javafx.graphics/com.sun.javafx.scene=ALL-UNNAMED", "--add-opens", "javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED")
-}
