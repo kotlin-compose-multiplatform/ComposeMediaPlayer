@@ -113,7 +113,7 @@ interface MFPlayerLibrary : Library {
 }
 
 /**
- * Exception spécifique pour MFPlayer
+ * Specific exception for MFPlayer
  */
 class MFPlayerException(message: String) : Exception(message)
 
