@@ -1,9 +1,11 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayer2
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
 
 import com.sun.jna.Callback
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
+import com.sun.jna.platform.win32.WinDef.BOOLByReference
+import com.sun.jna.ptr.FloatByReference
 import com.sun.jna.win32.StdCallLibrary
 
 /**
@@ -33,6 +35,7 @@ interface MediaPlayerLib : StdCallLibrary {
         fun invoke(eventType: Int, hr: Int)
     }
 
+    // Fonctions existantes
     fun InitializeMediaPlayer(hwnd: WinDef.HWND, callback: MediaPlayerCallback): Int
     fun PlayFile(filePath: WString): Int
     fun PausePlayback(): Int
@@ -42,4 +45,10 @@ interface MediaPlayerLib : StdCallLibrary {
     fun IsInitialized(): Boolean
     fun HasVideo(): Boolean
     fun UpdateVideo()
+
+    // Nouvelles fonctions pour le contrôle audio
+    fun SetVolume(level: Float): Int
+    fun GetVolume(pLevel: FloatByReference): Int
+    fun SetMute(bMute: Boolean): Int
+    fun GetMute(pbMute: BOOLByReference): Int
 }

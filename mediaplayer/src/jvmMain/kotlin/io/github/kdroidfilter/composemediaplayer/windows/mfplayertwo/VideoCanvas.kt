@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayer2
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
 
 import java.awt.Canvas
 import java.awt.Color

@@ -9,6 +9,18 @@
 #endif
 
 #ifdef __cplusplus
+
+// Template pour libérer en toute sécurité les interfaces COM
+template <class T>
+void SafeRelease(T **ppT)
+{
+    if (*ppT)
+    {
+        (*ppT)->Release();
+        *ppT = nullptr;
+    }
+}
+
 extern "C" {
 #endif
 
@@ -23,6 +35,8 @@ extern "C" {
 #endif
 
 #include <windows.h>
+
+
 
     // Event types for the callback
 #define MP_EVENT_MEDIAITEM_CREATED    1
@@ -50,6 +64,12 @@ extern "C" {
     MEDIAPLAYER_API BOOL    IsInitialized();
     MEDIAPLAYER_API BOOL    HasVideo();
 
+    MEDIAPLAYER_API HRESULT SetVolume(float level);    // niveau entre 0.0 et 1.0
+    MEDIAPLAYER_API HRESULT GetVolume(float* pLevel);
+    MEDIAPLAYER_API HRESULT SetMute(BOOL bMute);
+    MEDIAPLAYER_API HRESULT GetMute(BOOL* pbMute);
+
 #ifdef __cplusplus
+
 }
 #endif

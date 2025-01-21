@@ -1,12 +1,14 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayer2
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
 
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*
 import javax.swing.*
@@ -14,14 +16,9 @@ import javax.swing.Timer
 import javax.swing.filechooser.FileNameExtensionFilter
 import kotlin.system.exitProcess
 
-/**
- * Main window of the video player.
- */
 class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private val logger = Logger("VideoPlayer")
     private var isPaused = false
-
-    // Remove the playback check Timer to reduce noise.
     private var renderTimer: Timer? = null
 
     private val videoCanvas = VideoCanvas()
@@ -29,6 +26,18 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private val openButton = JButton("Open").apply { isEnabled = true }
     private val playPauseButton = JButton("Play").apply { isEnabled = false }
     private val stopButton = JButton("Stop").apply { isEnabled = false }
+
+    // Audio Controls
+    private val audioControl = AudioControl(MediaPlayerLib.INSTANCE)
+    private val volumeSlider = JSlider(JSlider.HORIZONTAL, 0, 100, 100).apply {
+        preferredSize = Dimension(100, 20)
+        toolTipText = "Volume"
+    }
+    private val muteButton = JButton().apply {
+        icon = createVolumeIcon(true)
+        toolTipText = "Mute"
+    }
+    private var isMuted = false
 
     private val mediaCallback = createMediaCallback()
 
@@ -38,6 +47,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             setupUI()
             setupListeners()
             initializeMediaPlayer()
+            initializeAudioControls()
             startRenderTimer()
         } catch (e: Exception) {
             logger.error("Initialization error", e)
@@ -65,11 +75,18 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
 
         controlPanel.layout = BoxLayout(controlPanel, BoxLayout.X_AXIS)
         controlPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
+
         controlPanel.add(openButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(playPauseButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(stopButton)
+
+        controlPanel.add(Box.createHorizontalGlue())
+
+        controlPanel.add(muteButton)
+        controlPanel.add(Box.createHorizontalStrut(5))
+        controlPanel.add(volumeSlider)
 
         add(controlPanel, BorderLayout.SOUTH)
     }
@@ -80,13 +97,32 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         stopButton.addActionListener { stopPlayback() }
     }
 
-    /**
-     * Starts a Timer to trigger repaint() ~30 times per second
-     * (if the video is playing, it allows refreshing the frame).
-     */
+    private fun initializeAudioControls() {
+        audioControl.getVolume()?.let { volume ->
+            volumeSlider.value = (volume * 100).toInt()
+        }
+
+        audioControl.getMute()?.let { muted ->
+            isMuted = muted
+            updateMuteButton()
+        }
+
+        volumeSlider.addChangeListener { e ->
+            if (!volumeSlider.valueIsAdjusting) {
+                val volumeValue = volumeSlider.value / 100f
+                audioControl.setVolume(volumeValue)
+                logger.log("Volume changed to: ${volumeSlider.value}%")
+            }
+        }
+
+        muteButton.addActionListener {
+            toggleMute()
+        }
+    }
+
     private fun startRenderTimer() {
         renderTimer?.stop()
-        renderTimer = Timer(60) { // ~30 FPS
+        renderTimer = Timer(60) {
             if (MediaPlayerLib.INSTANCE.IsInitialized() && MediaPlayerLib.INSTANCE.HasVideo()) {
                 videoCanvas.repaint()
             }
@@ -113,7 +149,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private fun initializeMediaPlayer() {
         SwingUtilities.invokeLater {
             try {
-                Thread.sleep(200) // Small delay to ensure the Canvas is initialized
+                Thread.sleep(200)
                 val hwnd = Native.getComponentPointer(videoCanvas)
                 logger.log("Initializing Media Player with HWND: $hwnd")
 
@@ -177,7 +213,6 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             showError("Error opening file", result)
         } else {
             logger.log("PlayFile successfully called.")
-            // Enable controls
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
         }
@@ -204,15 +239,53 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         }
     }
 
+    private fun toggleMute() {
+        isMuted = !isMuted
+        if (audioControl.setMute(isMuted)) {
+            updateMuteButton()
+            logger.log("Mute toggled: $isMuted")
+        }
+    }
+
+    private fun updateMuteButton() {
+        muteButton.icon = createVolumeIcon(!isMuted)
+        muteButton.toolTipText = if (isMuted) "Unmute" else "Mute"
+    }
+
+    private fun createVolumeIcon(volumeOn: Boolean): ImageIcon {
+        val size = 16
+        val image = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val g2 = image.createGraphics()
+
+        g2.color = Color.BLACK
+        if (volumeOn) {
+            g2.fillRect(4, 6, 3, 4)
+            g2.drawPolygon(
+                intArrayOf(7, 11, 11, 7),
+                intArrayOf(4, 2, 14, 12),
+                4
+            )
+        } else {
+            g2.fillRect(4, 6, 3, 4)
+            g2.drawPolygon(
+                intArrayOf(7, 11, 11, 7),
+                intArrayOf(4, 2, 14, 12),
+                4
+            )
+            g2.drawLine(13, 4, 4, 13)
+        }
+
+        g2.dispose()
+        return ImageIcon(image)
+    }
+
     private fun handleMediaItemCreated(hr: Int) {
         logger.log("handleMediaItemCreated, HR: 0x${hr.toString(16)}")
-        // Nothing special to do here; the next steps happen in MFP_EVENT_TYPE_MEDIAITEM_SET
     }
 
     private fun handleMediaItemSet(hr: Int) {
         logger.log("handleMediaItemSet, HR: 0x${hr.toString(16)}")
         if (checkHResult(hr)) {
-            // Enable buttons, etc.
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
         }
@@ -279,6 +352,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private fun cleanup() {
         logger.log("Cleaning up resources...")
         renderTimer?.stop()
+        audioControl.setMute(false)
         MediaPlayerLib.INSTANCE.CleanupMediaPlayer()
         dispose()
     }
