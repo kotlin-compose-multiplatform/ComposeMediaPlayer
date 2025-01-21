@@ -6,6 +6,8 @@ import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerSurface
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose.WindowsVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose.WindowsVideoPlayerSurface
 
 /**
  * Composable function for rendering a video player surface.
@@ -20,6 +22,7 @@ import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerSurface
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
     when (val delegate = playerState.delegate) {
+        is WindowsVideoPlayerState -> WindowsVideoPlayerSurface(delegate, modifier)
         is JavaFxVideoPlayerState -> JavaFxVideoPlayerSurface(delegate, modifier)
         is LinuxVideoPlayerState -> LinuxVideoPlayerSurface(delegate, modifier)
         else -> throw IllegalArgumentException("Unsupported player state type")
