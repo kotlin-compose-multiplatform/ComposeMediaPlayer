@@ -11,14 +11,14 @@ import com.sun.jna.win32.StdCallLibrary
 
 interface MediaPlayerLib : StdCallLibrary {
     companion object {
-
         const val MP_EVENT_MEDIAITEM_CREATED   = 1
         const val MP_EVENT_MEDIAITEM_SET       = 2
         const val MP_EVENT_PLAYBACK_STARTED    = 3
         const val MP_EVENT_PLAYBACK_STOPPED    = 4
         const val MP_EVENT_PLAYBACK_ERROR      = 5
         const val MP_EVENT_PLAYBACK_PAUSED     = 6
-
+        const val MP_EVENT_LOADING_STARTED     = 7
+        const val MP_EVENT_LOADING_COMPLETE    = 8
 
         val INSTANCE: MediaPlayerLib by lazy {
             try {
@@ -50,8 +50,11 @@ interface MediaPlayerLib : StdCallLibrary {
     fun ResumePlayback(): Int
     fun StopPlayback(): Int
     fun CleanupMediaPlayer()
+
+    // État du lecteur
     fun IsInitialized(): Boolean
     fun HasVideo(): Boolean
+    fun IsLoading(): Boolean
     fun UpdateVideo()
 
     //Audio Control

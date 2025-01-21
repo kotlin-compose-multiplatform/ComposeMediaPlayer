@@ -1,15 +1,13 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui
 
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.FlowLayout
+import java.awt.*
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
@@ -32,6 +30,10 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private val openUrlButton = JButton("Open URL").apply { isEnabled = true }
     private val playPauseButton = JButton("Play").apply { isEnabled = false }
     private val stopButton = JButton("Stop").apply { isEnabled = false }
+
+    // Ajout du LoaderOverlay
+    private val loaderOverlay = LoaderOverlay()
+    private var isLoading = false
 
     // Progress Slider
     private val progressSlider = JSlider(JSlider.HORIZONTAL, 0, 1000, 0).apply {
@@ -87,7 +89,23 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun setupUI() {
-        add(videoCanvas, BorderLayout.CENTER)
+        // Création du LayeredPane pour gérer le loader
+        val layeredPane = JLayeredPane()
+        layeredPane.layout = object : LayoutManager {
+            override fun addLayoutComponent(name: String?, comp: Component?) {}
+            override fun removeLayoutComponent(comp: Component?) {}
+            override fun preferredLayoutSize(parent: Container?) = parent?.size ?: Dimension(0, 0)
+            override fun minimumLayoutSize(parent: Container?) = preferredLayoutSize(parent)
+            override fun layoutContainer(parent: Container?) {
+                parent?.components?.forEach { it.setBounds(0, 0, parent.width, parent.height) }
+            }
+        }
+
+        layeredPane.add(videoCanvas, JLayeredPane.DEFAULT_LAYER)
+        layeredPane.add(loaderOverlay, JLayeredPane.POPUP_LAYER)
+        loaderOverlay.isVisible = false
+
+        add(layeredPane, BorderLayout.CENTER)
 
         controlPanel.layout = BoxLayout(controlPanel, BoxLayout.X_AXIS)
         controlPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
@@ -141,10 +159,26 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         progressTimer = Timer(100) { // Update every 100ms
             if (!userIsSeeking && MediaPlayerLib.INSTANCE.IsInitialized()) {
                 updateProgress()
+                updateLoadingState()
             }
         }
         progressTimer?.start()
     }
+
+    private fun updateLoadingState() {
+        val loading = MediaPlayerLib.INSTANCE.IsLoading()
+        if (loading != isLoading) {
+            isLoading = loading
+            SwingUtilities.invokeLater {
+                loaderOverlay.isVisible = isLoading
+                if (!isLoading) {
+                    revalidate()
+                    repaint()
+                }
+            }
+        }
+    }
+
 
     private fun updateProgress() {
         mediaSlider.getProgress()?.let { progress ->
@@ -216,6 +250,14 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                     MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> handlePlaybackPaused()
                     MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
                     MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
+                    MediaPlayerLib.MP_EVENT_LOADING_STARTED -> {
+                        isLoading = true
+                        loaderOverlay.isVisible = true
+                    }
+                    MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> {
+                        isLoading = false
+                        loaderOverlay.isVisible = false
+                    }
                 }
             }
         }
@@ -508,6 +550,8 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> "PLAYBACK_PAUSED"
             MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> "PLAYBACK_STOPPED"
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> "PLAYBACK_ERROR"
+            MediaPlayerLib.MP_EVENT_LOADING_STARTED -> "LOADING_STARTED"
+            MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> "LOADING_COMPLETE"
             else -> "UNKNOWN_EVENT($eventType)"
         }
     }
@@ -517,6 +561,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         renderTimer?.stop()
         progressTimer?.stop()
         audioControl.setMute(false)
+        loaderOverlay.stopAnimation()
         MediaPlayerLib.INSTANCE.CleanupMediaPlayer()
         dispose()
     }

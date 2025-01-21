@@ -1,5 +1,6 @@
 package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
 
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui.VideoPlayerWindow
 import javax.swing.SwingUtilities
 import javax.swing.UIManager
 import kotlin.system.exitProcess

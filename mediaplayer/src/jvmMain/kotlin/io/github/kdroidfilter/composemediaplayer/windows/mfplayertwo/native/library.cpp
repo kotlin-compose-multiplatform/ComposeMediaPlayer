@@ -21,6 +21,7 @@ struct PlayerState {
     std::atomic<bool>     hasVideo;
     std::atomic<bool>     isInitialized;
     std::atomic<bool>     isPlaying;
+    std::atomic<bool>     isLoading;
     CRITICAL_SECTION      lock;
     ISimpleAudioVolume* audioVolume;  // Pour le contrôle du volume
     IAudioSessionControl* audioSession;  // Pour le contrôle de session audio
@@ -284,6 +285,16 @@ HRESULT SetPosition(LONGLONG position)
     return hr;
 }
 
+// =============== Loading State ======================
+
+
+BOOL IsLoading()
+{
+    EnterCriticalSection(&g_state.lock);
+    BOOL isLoading = g_state.isLoading;
+    LeaveCriticalSection(&g_state.lock);
+    return isLoading;
+}
 
 // =============== MFPlay Callback Class ======================
 class MediaPlayerCallback : public IMFPMediaPlayerCallback {
@@ -325,6 +336,7 @@ public:
         if (FAILED(pEventHeader->hrEvent)) {
             // Notify an error occurred
             g_state.isPlaying = false;
+            g_state.isLoading = false;
             g_state.userCallback(MP_EVENT_PLAYBACK_ERROR, pEventHeader->hrEvent);
             LeaveCriticalSection(&g_state.lock);
             return;
@@ -352,6 +364,7 @@ public:
         case MFP_EVENT_TYPE_MEDIAITEM_SET:
         {
             LogDebugW(L"[Callback] MFP_EVENT_TYPE_MEDIAITEM_SET\n");
+            g_state.isLoading = false;
             g_state.userCallback(MP_EVENT_MEDIAITEM_SET, pEventHeader->hrEvent);
 
             // Start playback immediately
@@ -549,9 +562,14 @@ HRESULT PlayFile(const wchar_t* filePath)
 
     g_state.hasVideo = false;
     g_state.isPlaying = false;
+    g_state.isLoading = true;  // Début du chargement
 
     HRESULT hr = g_state.player->CreateMediaItemFromURL(filePath, FALSE, 0, nullptr);
     LogDebugW(L"[PlayFile] CreateMediaItemFromURL(%s) -> 0x%08x\n", filePath, hr);
+
+    if (FAILED(hr)) {
+        g_state.isLoading = false;  // Échec du chargement
+    }
 
     LeaveCriticalSection(&g_state.lock);
     return hr;
@@ -574,14 +592,18 @@ HRESULT PlayURL(const wchar_t* url)
 
     g_state.hasVideo = false;
     g_state.isPlaying = false;
+    g_state.isLoading = true;  // Début du chargement
 
-    // Utilise la même méthode que PlayFile mais avec l'URL
     HRESULT hr = g_state.player->CreateMediaItemFromURL(
-        url,        // URL du média
-        FALSE,      // Ne pas démarrer automatiquement
-        0,          // Pas d'options particulières
-        nullptr     // Pas de propriétés particulières
+        url,
+        FALSE,
+        0,
+        nullptr
     );
+
+    if (FAILED(hr)) {
+        g_state.isLoading = false;  // Échec du chargement
+    }
 
     LogDebugW(L"[PlayURL] CreateMediaItemFromURL(%s) -> 0x%08x\n", url, hr);
 
@@ -673,6 +695,7 @@ void CleanupMediaPlayer()
     EnterCriticalSection(&g_state.lock);
     g_state.isInitialized = false;
     g_state.isPlaying     = false;
+    g_state.isLoading     = false;
     g_state.hasVideo      = false;
     g_state.userCallback  = nullptr;
     g_state.hwnd          = nullptr;
