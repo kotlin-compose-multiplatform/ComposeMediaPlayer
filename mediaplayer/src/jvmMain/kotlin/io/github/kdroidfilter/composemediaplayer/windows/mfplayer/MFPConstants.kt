@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayer
 
 /**
  * Constants for MFPlayer
