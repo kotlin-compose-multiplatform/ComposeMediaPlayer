@@ -29,10 +29,10 @@ interface MediaPlayerLib : StdCallLibrary {
             }
         }
 
-        // Fonction utilitaire pour convertir 100ns en secondes
+        // Utility function to convert 100ns to seconds
         fun hundredNanoToSeconds(hundredNanoTime: Long): Double = hundredNanoTime / 10000000.0
 
-        // Fonction utilitaire pour convertir les secondes en 100ns
+        // Utility function to convert seconds to 100ns
         fun secondsToHundredNano(seconds: Double): Long = (seconds * 10000000.0).toLong()
     }
 
