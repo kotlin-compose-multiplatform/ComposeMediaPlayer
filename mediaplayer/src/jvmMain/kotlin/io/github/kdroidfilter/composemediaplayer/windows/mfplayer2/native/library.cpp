@@ -1,4 +1,4 @@
-#define WINVER _WIN32_WINNT_WIN7
+#define WINVER _WIN32_WINNT_WIN10
 #define MEDIAPLAYER_EXPORTS
 
 #include "library.h"
@@ -6,7 +6,7 @@
 #include <mfplay.h>
 #include <mferror.h>
 #include <mfapi.h>
-#include <stdio.h>
+#include <cstdio>
 #include <objbase.h>
 #include <new>
 #include <atomic>
@@ -34,7 +34,7 @@ static PlayerState g_state = {
 };
 
 // Playback thread + message loop
-static HANDLE g_hThread       = NULL;
+static HANDLE g_hThread       = nullptr;
 static DWORD  g_dwThreadId    = 0;
 static bool   g_bThreadActive = false;  // To check if it's running
 
@@ -66,7 +66,7 @@ private:
 public:
     MediaPlayerCallback() : m_cRef(1) {}
 
-    STDMETHODIMP QueryInterface(REFIID riid, void** ppv) {
+    STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
         if (!ppv) return E_POINTER;
         if (riid == IID_IMFPMediaPlayerCallback || riid == IID_IUnknown) {
             *ppv = static_cast<IMFPMediaPlayerCallback*>(this);
@@ -76,16 +76,16 @@ public:
         *ppv = nullptr;
         return E_NOINTERFACE;
     }
-    STDMETHODIMP_(ULONG) AddRef() {
+    STDMETHODIMP_(ULONG) AddRef() override {
         return InterlockedIncrement(&m_cRef);
     }
-    STDMETHODIMP_(ULONG) Release() {
+    STDMETHODIMP_(ULONG) Release() override {
         ULONG count = InterlockedDecrement(&m_cRef);
         if (count == 0) delete this;
         return count;
     }
 
-    void STDMETHODCALLTYPE OnMediaPlayerEvent(MFP_EVENT_HEADER* pEventHeader) {
+    void STDMETHODCALLTYPE OnMediaPlayerEvent(MFP_EVENT_HEADER* pEventHeader) override {
         if (!pEventHeader) return;
 
         EnterCriticalSection(&g_state.lock);
@@ -167,7 +167,7 @@ static DWORD WINAPI MediaThreadProc(LPVOID lpParam)
     HRESULT hr = S_OK;
 
     // Initialize COM in STA
-    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     if (FAILED(hr)) {
         LogDebugW(L"[MediaThreadProc] CoInitializeEx failed: 0x%08x\n", hr);
         return 1;
@@ -192,7 +192,7 @@ static DWORD WINAPI MediaThreadProc(LPVOID lpParam)
     // Create the MFPlay player
     EnterCriticalSection(&g_state.lock);
     hr = MFPCreateMediaPlayer(
-        NULL,               // URL: unnecessary, we'll use CreateMediaItemFromURL later
+        nullptr,               // URL: unnecessary, we'll use CreateMediaItemFromURL later
         FALSE,              // Do not auto-start
         0,                  // Flags (optional for further use)
         g_pCallback,        // Callback pointer
@@ -222,7 +222,7 @@ static DWORD WINAPI MediaThreadProc(LPVOID lpParam)
     while (g_bThreadActive)
     {
         // Wait for a message to be available
-        DWORD dwResult = MsgWaitForMultipleObjects(0, NULL, FALSE, INFINITE, QS_ALLINPUT);
+        DWORD dwResult = MsgWaitForMultipleObjects(0, nullptr, FALSE, INFINITE, QS_ALLINPUT);
         if (dwResult == WAIT_FAILED) {
             // Unexpected error
             LogDebugW(L"[MediaThreadProc] WAIT_FAILED\n");
@@ -230,7 +230,7 @@ static DWORD WINAPI MediaThreadProc(LPVOID lpParam)
         }
 
         // Process all available messages
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_QUIT) {
                 g_bThreadActive = false;
                 break;
@@ -318,7 +318,7 @@ HRESULT PlayFile(const wchar_t* filePath)
     g_state.hasVideo = false;
     g_state.isPlaying = false;
 
-    HRESULT hr = g_state.player->CreateMediaItemFromURL(filePath, FALSE, 0, NULL);
+    HRESULT hr = g_state.player->CreateMediaItemFromURL(filePath, FALSE, 0, nullptr);
     LogDebugW(L"[PlayFile] CreateMediaItemFromURL(%s) -> 0x%08x\n", filePath, hr);
 
     LeaveCriticalSection(&g_state.lock);
@@ -402,7 +402,7 @@ void CleanupMediaPlayer()
     if (g_hThread) {
         WaitForSingleObject(g_hThread, INFINITE);
         CloseHandle(g_hThread);
-        g_hThread = NULL;
+        g_hThread = nullptr;
     }
     g_dwThreadId = 0;
 
@@ -437,4 +437,4 @@ struct InitOnce {
     ~InitOnce() {
         DeleteCriticalSection(&g_state.lock);
     }
-} _initOnce;
+} initOnce;
