@@ -200,6 +200,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         logger.log("Render timer started (30 FPS)")
     }
 
+
     private fun createMediaCallback(): MediaPlayerLib.MediaPlayerCallback {
         return MediaPlayerLib.MediaPlayerCallback { eventType, hr ->
             SwingUtilities.invokeLater {
@@ -208,6 +209,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> handleMediaItemCreated(hr)
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> handleMediaItemSet(hr)
                     MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
+                    MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> handlePlaybackPaused()  // Add this handler
                     MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
                     MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
                 }
@@ -296,9 +298,9 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         }
 
         if (checkHResult(result)) {
-            isPaused = !isPaused
-            playPauseButton.text = if (isPaused) "Play" else "Pause"
-            logger.log("State changed: ${if (isPaused) "Paused" else "Playing"}")
+            // Don't update isPaused here - wait for the event callback
+            // The state will be updated in handlePlaybackPaused() or handlePlaybackStarted()
+            logger.log("Requested state change to: ${if (isPaused) "Playing" else "Paused"}")
         }
     }
 
@@ -371,6 +373,14 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         stopButton.isEnabled = true
     }
 
+    private fun handlePlaybackPaused() {
+        logger.log("Playback paused")
+        isPaused = true
+        playPauseButton.text = "Play"
+        playPauseButton.isEnabled = true
+        stopButton.isEnabled = true
+    }
+
     private fun handlePlaybackStopped() {
         logger.log("Playback stopped")
         isPaused = false
@@ -417,6 +427,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> "MEDIAITEM_CREATED"
             MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> "MEDIAITEM_SET"
             MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> "PLAYBACK_STARTED"
+            MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> "PLAYBACK_PAUSED"
             MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> "PLAYBACK_STOPPED"
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> "PLAYBACK_ERROR"
             else -> "UNKNOWN_EVENT($eventType)"

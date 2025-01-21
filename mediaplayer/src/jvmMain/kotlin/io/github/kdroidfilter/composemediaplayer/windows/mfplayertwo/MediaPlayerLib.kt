@@ -17,6 +17,8 @@ interface MediaPlayerLib : StdCallLibrary {
         const val MP_EVENT_PLAYBACK_STARTED    = 3
         const val MP_EVENT_PLAYBACK_STOPPED    = 4
         const val MP_EVENT_PLAYBACK_ERROR      = 5
+        const val MP_EVENT_PLAYBACK_PAUSED     = 6
+
 
         val INSTANCE: MediaPlayerLib by lazy {
             try {

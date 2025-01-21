@@ -361,15 +361,20 @@ public:
             }
             break;
         }
-        case MFP_EVENT_TYPE_PLAY:
-            LogDebugW(L"[Callback] MFP_EVENT_TYPE_PLAY -> PLAYBACK_STARTED\n");
+            case MFP_EVENT_TYPE_PLAY:
+                LogDebugW(L"[Callback] MFP_EVENT_TYPE_PLAY -> PLAYBACK_STARTED\n");
             g_state.isPlaying = true;
             g_state.userCallback(MP_EVENT_PLAYBACK_STARTED, pEventHeader->hrEvent);
             break;
 
-        case MFP_EVENT_TYPE_PAUSE:
-        case MFP_EVENT_TYPE_STOP:
-            LogDebugW(L"[Callback] MFP_EVENT_TYPE_STOP -> PLAYBACK_STOPPED\n");
+            case MFP_EVENT_TYPE_PAUSE:  // Handle PAUSE separately from STOP
+                LogDebugW(L"[Callback] MFP_EVENT_TYPE_PAUSE -> PLAYBACK_PAUSED\n");
+            g_state.isPlaying = false;
+            g_state.userCallback(MP_EVENT_PLAYBACK_PAUSED, pEventHeader->hrEvent); // Add new event type
+            break;
+
+            case MFP_EVENT_TYPE_STOP:
+                LogDebugW(L"[Callback] MFP_EVENT_TYPE_STOP -> PLAYBACK_STOPPED\n");
             g_state.isPlaying = false;
             g_state.userCallback(MP_EVENT_PLAYBACK_STOPPED, pEventHeader->hrEvent);
             break;

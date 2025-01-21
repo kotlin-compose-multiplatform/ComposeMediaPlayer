@@ -44,6 +44,7 @@ extern "C" {
 #define MP_EVENT_PLAYBACK_STARTED     3
 #define MP_EVENT_PLAYBACK_STOPPED     4
 #define MP_EVENT_PLAYBACK_ERROR       5
+#define MP_EVENT_PLAYBACK_PAUSED      6
 
     // Some internal error codes (example)
 #define MP_E_NOT_INITIALIZED     ((HRESULT)0x80000001L)
