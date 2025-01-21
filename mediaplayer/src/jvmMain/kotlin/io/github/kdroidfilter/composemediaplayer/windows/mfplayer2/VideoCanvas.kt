@@ -9,7 +9,6 @@ import java.awt.event.ComponentEvent
 
 /**
  * Canvas dedicated to video display.
- * Here, UpdateVideo() is no longer called systematically in paint().
  */
 class VideoCanvas : Canvas() {
     private val logger = Logger("VideoCanvas")
@@ -27,10 +26,7 @@ class VideoCanvas : Canvas() {
 
     override fun paint(g: Graphics) {
         super.paint(g)
-        // If you want to force update, you could reactivate:
-        // if (MediaPlayerLib.INSTANCE.IsInitialized() && MediaPlayerLib.INSTANCE.HasVideo()) {
-        //     MediaPlayerLib.INSTANCE.UpdateVideo()
-        // }
+
         if (!MediaPlayerLib.INSTANCE.HasVideo()) {
             // Draw black if no video
             g.color = Color.BLACK
