@@ -22,8 +22,8 @@ target_link_libraries(simpleplayer PRIVATE
 )
 
 target_compile_definitions(simpleplayer PRIVATE
-        WINVER=_WIN32_WINNT_WIN7
-        _WIN32_WINNT=_WIN32_WINNT_WIN7
+        WINVER=_WIN32_WINNT_WIN10
+        _WIN32_WINNT=0x0A00
         WIN32
         UNICODE
         _UNICODE
