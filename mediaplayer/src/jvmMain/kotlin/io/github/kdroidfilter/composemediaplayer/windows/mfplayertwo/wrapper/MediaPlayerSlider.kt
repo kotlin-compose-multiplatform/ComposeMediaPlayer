@@ -5,8 +5,8 @@ import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayer
 
 class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     /**
-     * Obtient la durée totale du média en secondes
-     * @return La durée en secondes, ou null si une erreur se produit
+     * Gets the total duration of the media in seconds
+     * @return The duration in seconds, or null if an error occurs
      */
     fun getDurationInSeconds(): Double? {
         val duration = LongByReference()
@@ -16,8 +16,8 @@ class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     }
 
     /**
-     * Obtient la position actuelle de lecture en secondes
-     * @return La position en secondes, ou null si une erreur se produit
+     * Gets the current playback position in seconds
+     * @return The position in seconds, or null if an error occurs
      */
     fun getCurrentPositionInSeconds(): Double? {
         val position = LongByReference()
@@ -27,9 +27,9 @@ class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     }
 
     /**
-     * Définit la position de lecture en secondes
-     * @param seconds La nouvelle position en secondes
-     * @return true si la position a été définie avec succès, false sinon
+     * Sets the playback position in seconds
+     * @param seconds The new position in seconds
+     * @return true if the position was set successfully, false otherwise
      */
     fun setPositionInSeconds(seconds: Double): Boolean {
         val position = MediaPlayerLib.secondsToHundredNano(seconds)
@@ -37,8 +37,8 @@ class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     }
 
     /**
-     * Obtient le pourcentage de progression actuel
-     * @return Le pourcentage entre 0.0 et 1.0, ou null si une erreur se produit
+     * Gets the current progress percentage
+     * @return The percentage between 0.0 and 1.0, or null if an error occurs
      */
     fun getProgress(): Float? {
         val duration = getDurationInSeconds() ?: return null
@@ -47,9 +47,9 @@ class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     }
 
     /**
-     * Définit la position par pourcentage
-     * @param progress Le pourcentage entre 0.0 et 1.0
-     * @return true si la position a été définie avec succès, false sinon
+     * Sets the position by percentage
+     * @param progress The percentage between 0.0 and 1.0
+     * @return true if the position was set successfully, false otherwise
      */
     fun setProgress(progress: Float): Boolean {
         if (progress !in 0f..1f) return false
