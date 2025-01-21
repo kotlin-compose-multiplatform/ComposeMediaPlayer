@@ -11,7 +11,7 @@ import com.sun.jna.win32.StdCallLibrary
 
 interface MediaPlayerLib : StdCallLibrary {
     companion object {
-        // Constantes existantes...
+
         const val MP_EVENT_MEDIAITEM_CREATED   = 1
         const val MP_EVENT_MEDIAITEM_SET       = 2
         const val MP_EVENT_PLAYBACK_STARTED    = 3
