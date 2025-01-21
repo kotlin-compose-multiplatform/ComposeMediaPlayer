@@ -12,7 +12,7 @@ import java.awt.event.ComponentEvent
  * Here, UpdateVideo() is no longer called systematically in paint().
  */
 class VideoCanvas : Canvas() {
-    private val logger = Logger("VideoCanvas")
+    private val logger2 = Logger2("VideoCanvas")
 
     init {
         background = Color.BLACK
@@ -20,18 +20,14 @@ class VideoCanvas : Canvas() {
         isVisible = true
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
-                logger.log("Canvas resized to: ${width}x${height}")
+                logger2.log("Canvas resized to: ${width}x${height}")
             }
         })
     }
 
     override fun paint(g: Graphics) {
         super.paint(g)
-        // If you want to force update, you could reactivate:
-        // if (MediaPlayerLib.INSTANCE.IsInitialized() && MediaPlayerLib.INSTANCE.HasVideo()) {
-        //     MediaPlayerLib.INSTANCE.UpdateVideo()
-        // }
-        if (!MediaPlayerLib.INSTANCE.HasVideo()) {
+        if (!MediaPlayerLib2.INSTANCE.HasVideo()) {
             // Draw black if no video
             g.color = Color.BLACK
             g.fillRect(0, 0, width, height)

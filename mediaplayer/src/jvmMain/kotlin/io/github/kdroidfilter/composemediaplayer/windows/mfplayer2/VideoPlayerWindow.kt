@@ -18,7 +18,7 @@ import kotlin.system.exitProcess
  * Main window of the video player.
  */
 class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
-    private val logger = Logger("VideoPlayer")
+    private val logger2 = Logger2("VideoPlayer")
     private var isPaused = false
 
     // Remove the playback check Timer to reduce noise.
@@ -40,7 +40,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             initializeMediaPlayer()
             startRenderTimer()
         } catch (e: Exception) {
-            logger.error("Initialization error", e)
+            logger2.error("Initialization error", e)
             showError("Initialization error", -1)
             exitProcess(1)
         }
@@ -87,24 +87,24 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private fun startRenderTimer() {
         renderTimer?.stop()
         renderTimer = Timer(60) { // ~30 FPS
-            if (MediaPlayerLib.INSTANCE.IsInitialized() && MediaPlayerLib.INSTANCE.HasVideo()) {
+            if (MediaPlayerLib2.INSTANCE.IsInitialized() && MediaPlayerLib2.INSTANCE.HasVideo()) {
                 videoCanvas.repaint()
             }
         }
         renderTimer?.start()
-        logger.log("Render timer started (30 FPS)")
+        logger2.log("Render timer started (30 FPS)")
     }
 
-    private fun createMediaCallback(): MediaPlayerLib.MediaPlayerCallback {
-        return MediaPlayerLib.MediaPlayerCallback { eventType, hr ->
+    private fun createMediaCallback(): MediaPlayerLib2.MediaPlayerCallback {
+        return MediaPlayerLib2.MediaPlayerCallback { eventType, hr ->
             SwingUtilities.invokeLater {
-                logger.log("Media Event: ${eventTypeToString(eventType)} (0x${hr.toString(16)})")
+                logger2.log("Media Event: ${eventTypeToString(eventType)} (0x${hr.toString(16)})")
                 when (eventType) {
-                    MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> handleMediaItemCreated(hr)
-                    MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> handleMediaItemSet(hr)
-                    MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
-                    MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
-                    MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
+                    MediaPlayerLib2.MP_EVENT_MEDIAITEM_CREATED -> handleMediaItemCreated(hr)
+                    MediaPlayerLib2.MP_EVENT_MEDIAITEM_SET -> handleMediaItemSet(hr)
+                    MediaPlayerLib2.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
+                    MediaPlayerLib2.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
+                    MediaPlayerLib2.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
                 }
             }
         }
@@ -115,20 +115,20 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             try {
                 Thread.sleep(200) // Small delay to ensure the Canvas is initialized
                 val hwnd = Native.getComponentPointer(videoCanvas)
-                logger.log("Initializing Media Player with HWND: $hwnd")
+                logger2.log("Initializing Media Player with HWND: $hwnd")
 
                 if (hwnd == null) {
                     throw RuntimeException("Unable to retrieve the Canvas HWND")
                 }
 
-                val result = MediaPlayerLib.INSTANCE.InitializeMediaPlayer(WinDef.HWND(hwnd), mediaCallback)
+                val result = MediaPlayerLib2.INSTANCE.InitializeMediaPlayer(WinDef.HWND(hwnd), mediaCallback)
                 if (!checkHResult(result)) {
                     throw RuntimeException("Media player initialization failed: 0x${result.toString(16)}")
                 }
 
-                logger.log("Media Player successfully initialized")
+                logger2.log("Media Player successfully initialized")
             } catch (e: Exception) {
-                logger.error("Failed to initialize the media player", e)
+                logger2.error("Failed to initialize the media player", e)
                 showError("Initialization error", -1)
                 exitProcess(1)
             }
@@ -140,7 +140,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             fileSelectionMode = JFileChooser.FILES_ONLY
             fileFilter = FileNameExtensionFilter(
                 "Video Files (*.mp4, *.avi, *.mkv, *.wmv)",
-                "mp4", "avi", "mkv", "wmv"
+                "mp4", "avi", "mkv", "wmv", "mov"
             )
             currentDirectory = File(System.getProperty("user.home"))
         }
@@ -151,32 +151,32 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun playFile(filePath: String) {
-        if (!MediaPlayerLib.INSTANCE.IsInitialized()) {
-            logger.error("The media player is not initialized.")
+        if (!MediaPlayerLib2.INSTANCE.IsInitialized()) {
+            logger2.error("The media player is not initialized.")
             return
         }
 
         val file = File(filePath)
         if (!file.exists()) {
-            logger.error("File does not exist: $filePath")
+            logger2.error("File does not exist: $filePath")
             showError("File does not exist", -1)
             return
         }
 
         val extension = file.extension.lowercase(Locale.getDefault())
         if (extension !in setOf("mp4", "avi", "wmv", "mkv")) {
-            logger.error("Unsupported file format: $extension")
+            logger2.error("Unsupported file format: $extension")
             showError("Unsupported file format", -1)
             return
         }
 
-        logger.log("Attempting to play file: $filePath")
-        val result = MediaPlayerLib.INSTANCE.PlayFile(WString(file.absolutePath))
+        logger2.log("Attempting to play file: $filePath")
+        val result = MediaPlayerLib2.INSTANCE.PlayFile(WString(file.absolutePath))
         if (!checkHResult(result)) {
-            logger.error("Failed to play file: 0x${result.toString(16)}")
+            logger2.error("Failed to play file: 0x${result.toString(16)}")
             showError("Error opening file", result)
         } else {
-            logger.log("PlayFile successfully called.")
+            logger2.log("PlayFile successfully called.")
             // Enable controls
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
@@ -185,32 +185,32 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
 
     private fun togglePlayPause() {
         val result = if (isPaused) {
-            MediaPlayerLib.INSTANCE.ResumePlayback()
+            MediaPlayerLib2.INSTANCE.ResumePlayback()
         } else {
-            MediaPlayerLib.INSTANCE.PausePlayback()
+            MediaPlayerLib2.INSTANCE.PausePlayback()
         }
 
         if (checkHResult(result)) {
             isPaused = !isPaused
             playPauseButton.text = if (isPaused) "Play" else "Pause"
-            logger.log("State changed: ${if (isPaused) "Paused" else "Playing"}")
+            logger2.log("State changed: ${if (isPaused) "Paused" else "Playing"}")
         }
     }
 
     private fun stopPlayback() {
-        val result = MediaPlayerLib.INSTANCE.StopPlayback()
+        val result = MediaPlayerLib2.INSTANCE.StopPlayback()
         if (checkHResult(result)) {
             handlePlaybackStopped()
         }
     }
 
     private fun handleMediaItemCreated(hr: Int) {
-        logger.log("handleMediaItemCreated, HR: 0x${hr.toString(16)}")
+        logger2.log("handleMediaItemCreated, HR: 0x${hr.toString(16)}")
         // Nothing special to do here; the next steps happen in MFP_EVENT_TYPE_MEDIAITEM_SET
     }
 
     private fun handleMediaItemSet(hr: Int) {
-        logger.log("handleMediaItemSet, HR: 0x${hr.toString(16)}")
+        logger2.log("handleMediaItemSet, HR: 0x${hr.toString(16)}")
         if (checkHResult(hr)) {
             // Enable buttons, etc.
             playPauseButton.isEnabled = true
@@ -219,7 +219,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackStarted() {
-        logger.log("Playback started")
+        logger2.log("Playback started")
         isPaused = false
         playPauseButton.text = "Pause"
         playPauseButton.isEnabled = true
@@ -227,7 +227,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackStopped() {
-        logger.log("Playback stopped")
+        logger2.log("Playback stopped")
         isPaused = false
         playPauseButton.text = "Play"
         playPauseButton.isEnabled = false
@@ -235,7 +235,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackError(hr: Int) {
-        logger.error("Playback error: 0x${hr.toString(16)}")
+        logger2.error("Playback error: 0x${hr.toString(16)}")
         showError("Playback error", hr)
         handlePlaybackStopped()
     }
@@ -248,7 +248,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                 -2147024891 -> "Access denied"
                 else -> "Unknown error"
             }
-            logger.error("HRESULT Error: 0x${hr.toString(16)} - $errorMessage")
+            logger2.error("HRESULT Error: 0x${hr.toString(16)} - $errorMessage")
             return false
         }
         return true
@@ -267,19 +267,19 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
 
     private fun eventTypeToString(eventType: Int): String {
         return when (eventType) {
-            MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> "MEDIAITEM_CREATED"
-            MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> "MEDIAITEM_SET"
-            MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> "PLAYBACK_STARTED"
-            MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> "PLAYBACK_STOPPED"
-            MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> "PLAYBACK_ERROR"
+            MediaPlayerLib2.MP_EVENT_MEDIAITEM_CREATED -> "MEDIAITEM_CREATED"
+            MediaPlayerLib2.MP_EVENT_MEDIAITEM_SET -> "MEDIAITEM_SET"
+            MediaPlayerLib2.MP_EVENT_PLAYBACK_STARTED -> "PLAYBACK_STARTED"
+            MediaPlayerLib2.MP_EVENT_PLAYBACK_STOPPED -> "PLAYBACK_STOPPED"
+            MediaPlayerLib2.MP_EVENT_PLAYBACK_ERROR -> "PLAYBACK_ERROR"
             else -> "UNKNOWN_EVENT($eventType)"
         }
     }
 
     private fun cleanup() {
-        logger.log("Cleaning up resources...")
+        logger2.log("Cleaning up resources...")
         renderTimer?.stop()
-        MediaPlayerLib.INSTANCE.CleanupMediaPlayer()
+        MediaPlayerLib2.INSTANCE.CleanupMediaPlayer()
         dispose()
     }
 }

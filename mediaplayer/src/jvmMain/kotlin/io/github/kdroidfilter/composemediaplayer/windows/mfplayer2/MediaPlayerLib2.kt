@@ -9,7 +9,7 @@ import com.sun.jna.win32.StdCallLibrary
 /**
  * JNA interface for the native MediaPlayer library.
  */
-interface MediaPlayerLib : StdCallLibrary {
+interface MediaPlayerLib2 : StdCallLibrary {
     companion object {
         const val MP_EVENT_MEDIAITEM_CREATED   = 1
         const val MP_EVENT_MEDIAITEM_SET       = 2
@@ -17,9 +17,9 @@ interface MediaPlayerLib : StdCallLibrary {
         const val MP_EVENT_PLAYBACK_STOPPED    = 4
         const val MP_EVENT_PLAYBACK_ERROR      = 5
 
-        val INSTANCE: MediaPlayerLib by lazy {
+        val INSTANCE: MediaPlayerLib2 by lazy {
             try {
-                Native.load("simpleplayer", MediaPlayerLib::class.java).also {
+                Native.load("simpleplayer", MediaPlayerLib2::class.java).also {
                     println("MediaPlayerLib loaded successfully")
                 }
             } catch (e: Exception) {
