@@ -3,6 +3,9 @@ package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension

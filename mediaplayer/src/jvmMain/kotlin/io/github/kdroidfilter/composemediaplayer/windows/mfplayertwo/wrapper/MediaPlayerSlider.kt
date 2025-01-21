@@ -1,6 +1,7 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
+package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper
 
 import com.sun.jna.ptr.LongByReference
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
 
 class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
     /**
