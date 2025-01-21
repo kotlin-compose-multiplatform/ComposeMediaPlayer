@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 /**
  * Simple logger with timestamps.
  */
-class Logger2(private val tag: String) {
+class Logger(private val tag: String) {
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
     fun log(message: String) {
