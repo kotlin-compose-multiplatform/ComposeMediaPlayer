@@ -64,7 +64,7 @@ static void LogDebugW(const wchar_t* format, ...)
 }
 
 
-// Fonction helper pour initialiser l'audio
+// =============== Audio Control ======================
 HRESULT InitializeAudioControl()
 {
     HRESULT hr = S_OK;
@@ -197,6 +197,90 @@ HRESULT GetMute(BOOL* pbMute)
     }
     LeaveCriticalSection(&g_state.lock);
 
+    return hr;
+}
+
+// =============== Slider ======================
+
+
+HRESULT GetDuration(LONGLONG* pDuration)
+{
+    if (!pDuration) return MP_E_INVALID_PARAMETER;
+
+    EnterCriticalSection(&g_state.lock);
+    if (!g_state.isInitialized || !g_state.player) {
+        LeaveCriticalSection(&g_state.lock);
+        return MP_E_NOT_INITIALIZED;
+    }
+
+    PROPVARIANT var;
+    PropVariantInit(&var);
+
+    // Get duration in 100ns units
+    HRESULT hr = g_state.player->GetDuration(
+        MFP_POSITIONTYPE_100NS,
+        &var
+    );
+
+    if (SUCCEEDED(hr)) {
+        *pDuration = var.hVal.QuadPart;
+    }
+
+    PropVariantClear(&var);
+    LeaveCriticalSection(&g_state.lock);
+    return hr;
+}
+
+HRESULT GetCurrentPosition(LONGLONG* pPosition)
+{
+    if (!pPosition) return MP_E_INVALID_PARAMETER;
+
+    EnterCriticalSection(&g_state.lock);
+    if (!g_state.isInitialized || !g_state.player) {
+        LeaveCriticalSection(&g_state.lock);
+        return MP_E_NOT_INITIALIZED;
+    }
+
+    PROPVARIANT var;
+    PropVariantInit(&var);
+
+    // Get current position in 100ns units
+    HRESULT hr = g_state.player->GetPosition(
+        MFP_POSITIONTYPE_100NS,
+        &var
+    );
+
+    if (SUCCEEDED(hr)) {
+        *pPosition = var.hVal.QuadPart;
+    }
+
+    PropVariantClear(&var);
+    LeaveCriticalSection(&g_state.lock);
+    return hr;
+}
+
+HRESULT SetPosition(LONGLONG position)
+{
+    EnterCriticalSection(&g_state.lock);
+    if (!g_state.isInitialized || !g_state.player) {
+        LeaveCriticalSection(&g_state.lock);
+        return MP_E_NOT_INITIALIZED;
+    }
+
+    PROPVARIANT var;
+    PropVariantInit(&var);
+
+    // Set the position in 100ns units
+    var.vt = VT_I8;
+    var.hVal.QuadPart = position;
+
+    HRESULT hr = g_state.player->SetPosition(
+        MFP_POSITIONTYPE_100NS,
+        &var
+    );
+
+    PropVariantClear(&var);
+    LeaveCriticalSection(&g_state.lock);
     return hr;
 }
 

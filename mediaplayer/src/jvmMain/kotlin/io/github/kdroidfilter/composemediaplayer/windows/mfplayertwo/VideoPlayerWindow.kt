@@ -20,12 +20,22 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private val logger = Logger("VideoPlayer")
     private var isPaused = false
     private var renderTimer: Timer? = null
+    private var progressTimer: Timer? = null
 
     private val videoCanvas = VideoCanvas()
     private val controlPanel = JPanel()
     private val openButton = JButton("Open").apply { isEnabled = true }
     private val playPauseButton = JButton("Play").apply { isEnabled = false }
     private val stopButton = JButton("Stop").apply { isEnabled = false }
+
+    // Progress Slider
+    private val progressSlider = JSlider(JSlider.HORIZONTAL, 0, 1000, 0).apply {
+        preferredSize = Dimension(300, 20)
+        toolTipText = "Progress"
+    }
+    private val timeLabel = JLabel("00:00:00 / 00:00:00")
+    private val mediaSlider = MediaPlayerSlider(MediaPlayerLib.INSTANCE)
+    private var userIsSeeking = false
 
     // Audio Controls
     private val audioControl = AudioControl(MediaPlayerLib.INSTANCE)
@@ -49,6 +59,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             initializeMediaPlayer()
             initializeAudioControls()
             startRenderTimer()
+            startProgressTimer()
         } catch (e: Exception) {
             logger.error("Initialization error", e)
             showError("Initialization error", -1)
@@ -76,14 +87,22 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         controlPanel.layout = BoxLayout(controlPanel, BoxLayout.X_AXIS)
         controlPanel.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
 
+        // Media Controls
         controlPanel.add(openButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(playPauseButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(stopButton)
+        controlPanel.add(Box.createHorizontalStrut(10))
+
+        // Progress Controls
+        controlPanel.add(timeLabel)
+        controlPanel.add(Box.createHorizontalStrut(5))
+        controlPanel.add(progressSlider)
 
         controlPanel.add(Box.createHorizontalGlue())
 
+        // Audio Controls
         controlPanel.add(muteButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(volumeSlider)
@@ -95,6 +114,53 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         openButton.addActionListener { openFile() }
         playPauseButton.addActionListener { togglePlayPause() }
         stopButton.addActionListener { stopPlayback() }
+
+        // Progress Slider Listeners
+        progressSlider.addChangeListener { e ->
+            if (progressSlider.valueIsAdjusting) {
+                userIsSeeking = true
+                updateTimeLabel()
+            } else if (userIsSeeking) {
+                userIsSeeking = false
+                val progress = progressSlider.value / 1000f
+                mediaSlider.setProgress(progress)
+            }
+        }
+    }
+
+    private fun startProgressTimer() {
+        progressTimer?.stop()
+        progressTimer = Timer(100) { // Update every 100ms
+            if (!userIsSeeking && MediaPlayerLib.INSTANCE.IsInitialized()) {
+                updateProgress()
+            }
+        }
+        progressTimer?.start()
+    }
+
+    private fun updateProgress() {
+        mediaSlider.getProgress()?.let { progress ->
+            progressSlider.value = (progress * 1000).toInt()
+            updateTimeLabel()
+        }
+    }
+
+    private fun updateTimeLabel() {
+        val currentSeconds = mediaSlider.getCurrentPositionInSeconds() ?: 0.0
+        val totalSeconds = mediaSlider.getDurationInSeconds() ?: 0.0
+
+        timeLabel.text = String.format(
+            "%s / %s",
+            formatTime(currentSeconds),
+            formatTime(totalSeconds)
+        )
+    }
+
+    private fun formatTime(seconds: Double): String {
+        val hours = (seconds / 3600).toInt()
+        val minutes = ((seconds % 3600) / 60).toInt()
+        val secs = (seconds % 60).toInt()
+        return String.format("%02d:%02d:%02d", hours, minutes, secs)
     }
 
     private fun initializeAudioControls() {
@@ -215,6 +281,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             logger.log("PlayFile successfully called.")
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
+            progressSlider.value = 0
         }
     }
 
@@ -288,6 +355,8 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         if (checkHResult(hr)) {
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
+            progressSlider.value = 0
+            updateTimeLabel()
         }
     }
 
@@ -305,6 +374,8 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         playPauseButton.text = "Play"
         playPauseButton.isEnabled = false
         stopButton.isEnabled = false
+        progressSlider.value = 0
+        updateTimeLabel()
     }
 
     private fun handlePlaybackError(hr: Int) {
@@ -352,6 +423,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private fun cleanup() {
         logger.log("Cleaning up resources...")
         renderTimer?.stop()
+        progressTimer?.stop()
         audioControl.setMute(false)
         MediaPlayerLib.INSTANCE.CleanupMediaPlayer()
         dispose()

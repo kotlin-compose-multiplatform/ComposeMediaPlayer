@@ -64,10 +64,16 @@ extern "C" {
     MEDIAPLAYER_API BOOL    IsInitialized();
     MEDIAPLAYER_API BOOL    HasVideo();
 
+    // Volume
     MEDIAPLAYER_API HRESULT SetVolume(float level);    // niveau entre 0.0 et 1.0
     MEDIAPLAYER_API HRESULT GetVolume(float* pLevel);
     MEDIAPLAYER_API HRESULT SetMute(BOOL bMute);
     MEDIAPLAYER_API HRESULT GetMute(BOOL* pbMute);
+
+    // slider
+    MEDIAPLAYER_API HRESULT GetDuration(LONGLONG* pDuration);  // Durée totale en 100ns units
+    MEDIAPLAYER_API HRESULT GetCurrentPosition(LONGLONG* pPosition); // Position actuelle
+    MEDIAPLAYER_API HRESULT SetPosition(LONGLONG position); // Définir la position
 
 #ifdef __cplusplus
 

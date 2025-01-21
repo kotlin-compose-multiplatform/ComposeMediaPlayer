@@ -6,13 +6,12 @@ import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinDef.BOOLByReference
 import com.sun.jna.ptr.FloatByReference
+import com.sun.jna.ptr.LongByReference
 import com.sun.jna.win32.StdCallLibrary
 
-/**
- * JNA interface for the native MediaPlayer library.
- */
 interface MediaPlayerLib : StdCallLibrary {
     companion object {
+        // Constantes existantes...
         const val MP_EVENT_MEDIAITEM_CREATED   = 1
         const val MP_EVENT_MEDIAITEM_SET       = 2
         const val MP_EVENT_PLAYBACK_STARTED    = 3
@@ -29,13 +28,19 @@ interface MediaPlayerLib : StdCallLibrary {
                 throw RuntimeException("Failed to load simpleplayer library", e)
             }
         }
+
+        // Fonction utilitaire pour convertir 100ns en secondes
+        fun hundredNanoToSeconds(hundredNanoTime: Long): Double = hundredNanoTime / 10000000.0
+
+        // Fonction utilitaire pour convertir les secondes en 100ns
+        fun secondsToHundredNano(seconds: Double): Long = (seconds * 10000000.0).toLong()
     }
 
     fun interface MediaPlayerCallback : Callback {
         fun invoke(eventType: Int, hr: Int)
     }
 
-    // Fonctions existantes
+    // Main functions
     fun InitializeMediaPlayer(hwnd: WinDef.HWND, callback: MediaPlayerCallback): Int
     fun PlayFile(filePath: WString): Int
     fun PausePlayback(): Int
@@ -46,9 +51,14 @@ interface MediaPlayerLib : StdCallLibrary {
     fun HasVideo(): Boolean
     fun UpdateVideo()
 
-    // Nouvelles fonctions pour le contrôle audio
+    //Audio Control
     fun SetVolume(level: Float): Int
     fun GetVolume(pLevel: FloatByReference): Int
     fun SetMute(bMute: Boolean): Int
     fun GetMute(pbMute: BOOLByReference): Int
+
+    // slider
+    fun GetDuration(pDuration: LongByReference): Int
+    fun GetCurrentPosition(pPosition: LongByReference): Int
+    fun SetPosition(position: Long): Int
 }
