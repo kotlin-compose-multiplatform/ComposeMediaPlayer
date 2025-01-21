@@ -66,13 +66,17 @@ kotlin {
             implementation(libs.jna)
             implementation(libs.jna.platform)
 
-            implementation("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-swing:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-media:${javafxVersion}:${fxClassifier}")
+            compileOnly("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
+            compileOnly("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
+            compileOnly("org.openjfx:javafx-swing:${javafxVersion}:${fxClassifier}")
+            compileOnly("org.openjfx:javafx-media:${javafxVersion}:${fxClassifier}")
         }
 
         iosMain.dependencies {
+        }
+
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser.wasm.js)
         }
 
     }
