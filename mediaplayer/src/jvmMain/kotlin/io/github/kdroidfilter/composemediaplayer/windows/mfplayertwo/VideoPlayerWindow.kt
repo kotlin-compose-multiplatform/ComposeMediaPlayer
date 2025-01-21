@@ -9,6 +9,7 @@ import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.Med
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
+import java.awt.FlowLayout
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
@@ -28,6 +29,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private val videoCanvas = VideoCanvas()
     private val controlPanel = JPanel()
     private val openButton = JButton("Open").apply { isEnabled = true }
+    private val openUrlButton = JButton("Open URL").apply { isEnabled = true }
     private val playPauseButton = JButton("Play").apply { isEnabled = false }
     private val stopButton = JButton("Stop").apply { isEnabled = false }
 
@@ -93,6 +95,8 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         // Media Controls
         controlPanel.add(openButton)
         controlPanel.add(Box.createHorizontalStrut(5))
+        controlPanel.add(openUrlButton)
+        controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(playPauseButton)
         controlPanel.add(Box.createHorizontalStrut(5))
         controlPanel.add(stopButton)
@@ -115,6 +119,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
 
     private fun setupListeners() {
         openButton.addActionListener { openFile() }
+        openUrlButton.addActionListener { openUrlDialog() }
         playPauseButton.addActionListener { togglePlayPause() }
         stopButton.addActionListener { stopPlayback() }
 
@@ -200,7 +205,6 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         logger.log("Render timer started (30 FPS)")
     }
 
-
     private fun createMediaCallback(): MediaPlayerLib.MediaPlayerCallback {
         return MediaPlayerLib.MediaPlayerCallback { eventType, hr ->
             SwingUtilities.invokeLater {
@@ -209,7 +213,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> handleMediaItemCreated(hr)
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> handleMediaItemSet(hr)
                     MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
-                    MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> handlePlaybackPaused()  // Add this handler
+                    MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> handlePlaybackPaused()
                     MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
                     MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
                 }
@@ -239,6 +243,82 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                 showError("Initialization error", -1)
                 exitProcess(1)
             }
+        }
+    }
+
+    private fun openUrlDialog() {
+        val dialog = JDialog(this, "Open URL", true)
+        dialog.layout = BorderLayout(10, 10)
+
+        val urlPanel = JPanel(BorderLayout(5, 5))
+        urlPanel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
+
+        val urlField = JTextField(30)
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT))
+
+        val openButton = JButton("Open")
+        val cancelButton = JButton("Cancel")
+
+        urlPanel.add(JLabel("Enter URL:"), BorderLayout.NORTH)
+        urlPanel.add(urlField, BorderLayout.CENTER)
+
+        buttonPanel.add(openButton)
+        buttonPanel.add(cancelButton)
+
+        dialog.add(urlPanel, BorderLayout.CENTER)
+        dialog.add(buttonPanel, BorderLayout.SOUTH)
+
+        openButton.addActionListener {
+            val url = urlField.text.trim()
+            if (url.isNotEmpty()) {
+                playUrl(url)
+                dialog.dispose()
+            } else {
+                JOptionPane.showMessageDialog(
+                    dialog,
+                    "Please enter a valid URL",
+                    "Invalid URL",
+                    JOptionPane.WARNING_MESSAGE
+                )
+            }
+        }
+
+        cancelButton.addActionListener {
+            dialog.dispose()
+        }
+
+        urlField.addActionListener {
+            openButton.doClick()
+        }
+
+        dialog.pack()
+        dialog.setLocationRelativeTo(this)
+        dialog.isResizable = false
+        dialog.defaultCloseOperation = JDialog.DISPOSE_ON_CLOSE
+        dialog.isVisible = true
+    }
+
+    private fun playUrl(url: String) {
+        if (!MediaPlayerLib.INSTANCE.IsInitialized()) {
+            logger.error("The media player is not initialized.")
+            return
+        }
+
+        try {
+            logger.log("Attempting to play URL: $url")
+            val result = MediaPlayerLib.INSTANCE.PlayURL(WString(url))
+            if (!checkHResult(result)) {
+                logger.error("Failed to play URL: 0x${result.toString(16)}")
+                showError("Error opening URL", result)
+            } else {
+                logger.log("PlayURL successfully called.")
+                playPauseButton.isEnabled = true
+                stopButton.isEnabled = true
+                progressSlider.value = 0
+            }
+        } catch (e: Exception) {
+            logger.error("Error playing URL", e)
+            showError("Error playing URL", -1)
         }
     }
 
@@ -298,8 +378,6 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         }
 
         if (checkHResult(result)) {
-            // Don't update isPaused here - wait for the event callback
-            // The state will be updated in handlePlaybackPaused() or handlePlaybackStarted()
             logger.log("Requested state change to: ${if (isPaused) "Playing" else "Paused"}")
         }
     }

@@ -557,6 +557,38 @@ HRESULT PlayFile(const wchar_t* filePath)
     return hr;
 }
 
+HRESULT PlayURL(const wchar_t* url)
+{
+    if (!url)
+    {
+        return MP_E_INVALID_PARAMETER;
+    }
+
+    EnterCriticalSection(&g_state.lock);
+
+    if (!g_state.isInitialized || !g_state.player)
+    {
+        LeaveCriticalSection(&g_state.lock);
+        return MP_E_NOT_INITIALIZED;
+    }
+
+    g_state.hasVideo = false;
+    g_state.isPlaying = false;
+
+    // Utilise la même méthode que PlayFile mais avec l'URL
+    HRESULT hr = g_state.player->CreateMediaItemFromURL(
+        url,        // URL du média
+        FALSE,      // Ne pas démarrer automatiquement
+        0,          // Pas d'options particulières
+        nullptr     // Pas de propriétés particulières
+    );
+
+    LogDebugW(L"[PlayURL] CreateMediaItemFromURL(%s) -> 0x%08x\n", url, hr);
+
+    LeaveCriticalSection(&g_state.lock);
+    return hr;
+}
+
 // 3) PausePlayback
 HRESULT PausePlayback()
 {

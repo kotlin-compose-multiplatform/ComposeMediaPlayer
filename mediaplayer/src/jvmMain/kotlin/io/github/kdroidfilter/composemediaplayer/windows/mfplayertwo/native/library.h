@@ -57,6 +57,7 @@ extern "C" {
     // Functions exposed by the DLL
     MEDIAPLAYER_API HRESULT InitializeMediaPlayer(HWND hwnd, MEDIA_PLAYER_CALLBACK callback);
     MEDIAPLAYER_API HRESULT PlayFile(const wchar_t* filePath);
+    MEDIAPLAYER_API HRESULT PlayURL(const wchar_t* url);
     MEDIAPLAYER_API HRESULT PausePlayback();
     MEDIAPLAYER_API HRESULT ResumePlayback();
     MEDIAPLAYER_API HRESULT StopPlayback();

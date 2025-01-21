@@ -45,6 +45,7 @@ interface MediaPlayerLib : StdCallLibrary {
     // Main functions
     fun InitializeMediaPlayer(hwnd: WinDef.HWND, callback: MediaPlayerCallback): Int
     fun PlayFile(filePath: WString): Int
+    fun PlayURL(url: WString): Int
     fun PausePlayback(): Int
     fun ResumePlayback(): Int
     fun StopPlayback(): Int
