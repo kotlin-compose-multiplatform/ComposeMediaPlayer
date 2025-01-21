@@ -19,25 +19,22 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.swing.SwingUtilities
 
-
 class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private val mediaPlayer = MediaPlayerLib.INSTANCE
     private val audioControl = AudioControl(mediaPlayer)
     private val mediaSlider = MediaPlayerSlider(mediaPlayer)
     private var videoCanvas: Canvas? = null
     private var loadingTimeoutJob: Job? = null
+    private var videoUpdateJob: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // Initialization state
     var isInitialized by mutableStateOf(false)
         private set
 
-    // Playback states
     private var _isPlaying by mutableStateOf(false)
     override val isPlaying: Boolean
         get() = _isPlaying
 
-    // Volume
     private var _volume by mutableStateOf(1f)
     override var volume: Float
         get() = _volume
@@ -46,77 +43,108 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             audioControl.setVolume(_volume)
         }
 
-    // Slider position
+    private var _currentTime by mutableStateOf(0.0)
+    private var _duration by mutableStateOf(0.0)
+    private var _progress by mutableStateOf(0f)
+
     override var sliderPos: Float
-        get() {
-            val duration = mediaSlider.getDurationInSeconds() ?: 0.0
-            val position = mediaSlider.getCurrentPositionInSeconds() ?: 0.0
-            return if (duration > 0.0) (position / duration).toFloat() else 0f
-        }
+        get() = _progress
         set(value) {
             if (isInitialized && value in 0f..1f) {
-                val duration = mediaSlider.getDurationInSeconds() ?: return
-                mediaSlider.setPositionInSeconds(duration * value)
+                userDragging = true
+                log("Setting slider position: $value")
+                val ok = mediaSlider.setProgress(value)
+                if (ok) {
+                    _progress = value
+                    log("Seek success => new progress=$value")
+                } else {
+                    log("Seek failed => setProgress returned false")
+                }
+                userDragging = false
             }
         }
 
-    // User control states
     private var _userDragging by mutableStateOf(false)
     override var userDragging: Boolean
         get() = _userDragging
         set(value) { _userDragging = value }
 
-    // Loop mode
     private var _loop by mutableStateOf(false)
     override var loop: Boolean
         get() = _loop
         set(value) { _loop = value }
 
-    // Audio levels (not implemented)
     override val leftLevel: Float get() = 0f
     override val rightLevel: Float get() = 0f
-
-    // Time states
-    private var _currentTime by mutableStateOf(0.0)
-    private var _duration by mutableStateOf(0.0)
 
     override val positionText: String get() = formatSeconds(_currentTime)
     override val durationText: String get() = formatSeconds(_duration)
 
-    // Loading state and errors
     override var isLoading by mutableStateOf(false)
     private var _error: VideoPlayerError? by mutableStateOf(null)
     override val error: VideoPlayerError? get() = _error
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    fun checkPlayerState(): Boolean {
-        if (!isInitialized) {
-            log("Player is not initialized")
-            return false
+    // --------------------------------
+    //  Start/Stop Updates
+    // --------------------------------
+    private fun startVideoUpdates() {
+        videoUpdateJob?.cancel()
+        videoUpdateJob = coroutineScope.launch {
+            while (isActive) {
+                if (isInitialized && !userDragging) {
+                    withContext(Dispatchers.Main) {
+                        updateVideo()
+                        updateProgress()
+                    }
+                }
+                delay(60)
+            }
         }
-
-        if (videoCanvas == null) {
-            log("No canvas available")
-            return false
-        }
-
-        return true
     }
 
+    private fun stopVideoUpdates() {
+        videoUpdateJob?.cancel()
+        videoUpdateJob = null
+    }
+
+    private fun updateProgress() {
+        try {
+            if (!userDragging && mediaPlayer.IsInitialized()) {
+                // Retrieve the duration first
+                val duration = mediaSlider.getDurationInSeconds() ?: return
+                if (duration <= 0.0) return
+                _duration = duration
+
+                // Retrieve the current position
+                val position = mediaSlider.getCurrentPositionInSeconds() ?: return
+                _currentTime = position
+
+                // Manually calculate progress instead of relying on getProgress
+                _progress = (_currentTime / _duration).toFloat()
+
+                log("Progress updated: time=${formatSeconds(_currentTime)}/${formatSeconds(_duration)}, progress=$_progress")
+            }
+        } catch (e: Exception) {
+            log("Error updating progress: ${e.message}")
+        }
+    }
+
+    // --------------------------------
+    //  Initialization Methods
+    // --------------------------------
     fun initializeWithCanvas(canvas: Canvas) {
         if (isInitialized) {
             log("Player is already initialized")
             return
         }
-
         try {
             val hwnd = Native.getComponentPointer(canvas)
             if (hwnd == null) {
                 log("initializeWithCanvas: NULL HWND, Canvas not displayable")
                 return
             }
-
             log("initializeWithCanvas: HWND=$hwnd")
 
             val callback = MediaPlayerLib.MediaPlayerCallback { eventType, result ->
@@ -125,7 +153,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
 
-            // Wait for canvas to be actually ready
             SwingUtilities.invokeLater {
                 if (!canvas.isDisplayable) {
                     canvas.createBufferStrategy(1)
@@ -141,6 +168,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
                 videoCanvas = canvas
                 isInitialized = true
+                startVideoUpdates()
                 log("Player successfully initialized")
             }
         } catch (e: Exception) {
@@ -149,6 +177,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+    // --------------------------------
+    //  Source Management
+    // --------------------------------
     override fun openUri(uri: String) {
         if (!isInitialized) {
             val msg = "Media player not initialized"
@@ -158,14 +189,14 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             return
         }
 
-        // Cancel ongoing operations
         loadingTimeoutJob?.cancel()
         _isPlaying = false
-
-        // Reset states
         errorMessage = null
         _error = null
         isLoading = false
+        _currentTime = 0.0
+        _duration = 0.0
+        _progress = 0f
 
         coroutineScope.launch {
             try {
@@ -178,8 +209,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                         throw Exception("File does not exist: $uri")
                     }
                     log("Opening file: ${file.absolutePath}")
-
-                    // Use withContext to ensure operation is completed
                     withContext(Dispatchers.IO) {
                         mediaPlayer.PlayFile(WString(file.absolutePath))
                     }
@@ -196,9 +225,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                     return@launch
                 }
 
-                // Set up timeout
+                // Timeout if loading exceeds 10s
                 loadingTimeoutJob = launch {
-                    delay(10000) // 10 seconds timeout
+                    delay(10000)
                     if (isLoading) {
                         isLoading = false
                         val msg = "Timeout while loading media"
@@ -207,7 +236,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                         log(msg)
                     }
                 }
-
             } catch (e: Exception) {
                 val msg = "Error openUri: ${e.message}"
                 withContext(Dispatchers.Main) {
@@ -221,6 +249,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+    // --------------------------------
+    //  Playback Controls
+    // --------------------------------
     override fun play() {
         if (!isInitialized) return
         val hr = mediaPlayer.ResumePlayback()
@@ -256,11 +287,26 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
     override fun seekTo(value: Float) {
         if (!isInitialized) return
-        mediaSlider.setPositionInSeconds(value.toDouble())
+        userDragging = true
+        log("Seeking to: $value")
+
+        val ok = mediaSlider.setProgress(value)
+        if (ok) {
+            _progress = value
+            log("SeekTo($value) => OK")
+        } else {
+            log("SeekTo($value) => FAILED")
+        }
+
+        userDragging = false
     }
 
+    // --------------------------------
+    //  Cleanup (to be called at the right time)
+    // --------------------------------
     override fun dispose() {
         if (isInitialized) {
+            stopVideoUpdates()
             loadingTimeoutJob?.cancel()
             coroutineScope.cancel()
 
@@ -273,6 +319,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
             isInitialized = false
             _isPlaying = false
+            _currentTime = 0.0
+            _duration = 0.0
+            _progress = 0f
             videoCanvas = null
             log("dispose: MediaPlayer cleaned up")
         }
@@ -283,10 +332,12 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _error = null
     }
 
+    // --------------------------------
+    //  Updates
+    // --------------------------------
     fun updateVideo() {
         if (isInitialized) {
             mediaPlayer.UpdateVideo()
-            updateProgress()
         }
     }
 
@@ -294,7 +345,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         log("onMediaEvent: $eventType (HR=0x${hr.toString(16)})")
         when (eventType) {
             MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> {
-                // Wait for MP_EVENT_MEDIAITEM_SET
+                // Waiting for MP_EVENT_MEDIAITEM_SET
             }
             MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> {
                 updateProgress()
@@ -310,10 +361,12 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> {
                 _isPlaying = false
                 isLoading = false
+                _currentTime = 0.0
+                _progress = 0f
+
                 if (loop) {
-                    // Optional: Reimplement loop logic here if needed
-                    // mediaPlayer.SetPosition(0)
-                    // mediaPlayer.ResumePlayback()
+                    mediaSlider.setProgress(0f)
+                    play()
                 }
             }
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> {
@@ -333,15 +386,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 isLoading = false
                 log("Loading complete")
             }
-        }
-    }
-
-    private fun updateProgress() {
-        mediaSlider.getDurationInSeconds()?.let { dur ->
-            _duration = dur
-        }
-        mediaSlider.getCurrentPositionInSeconds()?.let { pos ->
-            _currentTime = pos
         }
     }
 
