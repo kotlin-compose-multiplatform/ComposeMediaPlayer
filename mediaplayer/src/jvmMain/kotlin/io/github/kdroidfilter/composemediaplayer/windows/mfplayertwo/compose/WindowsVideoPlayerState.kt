@@ -46,7 +46,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var isInitialized by mutableStateOf(false)
         private set
 
-    private var _isPlaying by mutableStateOf(false)
+    private var _isPlaying by mutableStateOf(mediaPlayer.IsPlaying())
     override val isPlaying: Boolean
         get() {
             if (!isInitialized || isLoading) return false
@@ -240,9 +240,32 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                         _currentTime = pos
                         _progress = (pos / dur).toFloat().coerceIn(0f, 1f)
 
-                        // Détecte si on a atteint la fin de la vidéo
-                        if (pos >= dur) {
-                            handlePlaybackEnded()
+                        // Debug logging
+                        if (pos >= dur - 0.1) { // Slightly before the end
+                            logger.log("Near video end - pos: $pos, dur: $dur, loop: $_loop, isPlaying: $_isPlaying")
+                            // If looping is off, stop playback and set isPlaying to false
+                            if (!_loop) {
+                                _isPlaying = false
+                                mediaPlayer.StopPlayback()
+                            } else {
+                                // If looping is on, ensure isPlaying remains true and restart playback
+                                _isPlaying = true
+                                logger.log("Attempting loop in updateProgressFromPlayer")
+                                coroutineScope.launch(Dispatchers.Main) {
+                                    try {
+                                        // Seek to start
+                                        mediaSlider.setProgress(0f)
+                                        _currentTime = 0.0
+                                        _progress = 0f
+                                        mediaPlayer.StopPlayback()
+                                        delay(50) // Small delay to ensure stop is processed
+                                        mediaPlayer.ResumePlayback()
+                                        logger.log("Loop attempt completed")
+                                    } catch (e: Exception) {
+                                        logger.error("Loop attempt failed: ${e.message}")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -310,12 +333,18 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         when (eventType) {
             MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> updateProgressFromPlayer()
             MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
-            MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> _isPlaying = false
+            MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> {
+                logger.log("Playback paused")
+                _isPlaying = false
+            }
             MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
             MediaPlayerLib.MP_EVENT_LOADING_STARTED -> handleLoadingStarted()
             MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> handleLoadingComplete()
-            MediaPlayerLib.MP_EVENT_PLAYBACK_ENDED -> handlePlaybackEnded()
+            MediaPlayerLib.MP_EVENT_PLAYBACK_ENDED -> {
+                logger.log("Playback ended event received")
+                handlePlaybackEnded()
+            }
         }
     }
 
@@ -364,13 +393,43 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     }
 
     private fun handlePlaybackEnded() {
-        _isPlaying = false
-        if (_loop) {
-            coroutineScope.launch {
-                mediaSlider.setProgress(0f)
-                _currentTime = 0.0
-                _progress = 0f
-                play()
+        logger.log("handlePlaybackEnded called - loop: $_loop, isPlaying: $_isPlaying")
+        if (!_loop) {
+            _isPlaying = false
+        } else {
+            coroutineScope.launch(Dispatchers.Main) {
+                try {
+                    logger.log("Starting loop in handlePlaybackEnded")
+                    _isPlaying = true
+                    mediaSlider.setProgress(0f)
+                    _currentTime = 0.0
+                    _progress = 0f
+                    mediaPlayer.StopPlayback()
+                    delay(50)
+                    mediaPlayer.ResumePlayback()
+                    logger.log("Loop completed in handlePlaybackEnded")
+                } catch (e: Exception) {
+                    logger.error("Loop failed in handlePlaybackEnded: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun handleReachingEnd() {
+        logger.log("handleReachingEnd - loop: $_loop, isPlaying: $_isPlaying")
+        if (_loop && _isPlaying) {
+            coroutineScope.launch(Dispatchers.Main) {
+                try {
+                    mediaSlider.setProgress(0f)
+                    _currentTime = 0.0
+                    _progress = 0f
+                    mediaPlayer.StopPlayback()
+                    delay(50)
+                    mediaPlayer.ResumePlayback()
+                    logger.log("End handling completed")
+                } catch (e: Exception) {
+                    logger.error("End handling failed: ${e.message}")
+                }
             }
         }
     }

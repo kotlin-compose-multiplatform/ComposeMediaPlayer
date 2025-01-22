@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui.VideoCanvas
-import java.awt.Color
 import javax.swing.SwingUtilities
 
 @Composable
@@ -19,7 +18,6 @@ fun WindowsVideoPlayerSurface(
             modifier = Modifier.fillMaxSize(),
             factory = {
                 VideoCanvas().apply {
-                    background = Color.BLACK
                     SwingUtilities.invokeLater {
                         if (!playerState.isInitialized) {
                             playerState.initializeWithCanvas(this)
