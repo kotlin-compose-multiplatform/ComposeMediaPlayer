@@ -13,7 +13,9 @@ import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onEach
 import java.awt.Canvas
 import java.io.File
 import java.io.FileNotFoundException
@@ -21,8 +23,9 @@ import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class WindowsVideoPlayerState : PlatformVideoPlayerState {
+
     companion object {
-        private const val UPDATE_INTERVAL = 16L  // ~60fps to match Android
+        private const val UPDATE_INTERVAL = 60L  // ~60 FPS
         private val LOADING_TIMEOUT = 10.seconds
         private val logger = Logger("WindowsVideoPlayerState")
     }
@@ -32,8 +35,10 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private val mediaSlider = MediaPlayerSlider(mediaPlayer)
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // State holders
+    // Rendering canvas
     private var videoCanvas: Canvas? = null
+
+    // Background jobs
     private var loadingTimeoutJob: Job? = null
     private var videoUpdateJob: Job? = null
 
@@ -55,59 +60,26 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
     private var _currentTime by mutableStateOf(0.0)
     private var _duration by mutableStateOf(0.0)
-    private var _progress by mutableStateOf(0f)
+    private var _progress by mutableStateOf(0f)  // Fraction between 0f..1f
 
-    private var pendingSeek: Float? = null
-    private var seekInProgress = false
-    private var lastSeekValue: Float = 0f
-
-
+    // Virtual slider 0..1000
     override var sliderPos: Float
         get() = _progress * 1000f
         set(value) {
             if (!isInitialized) return
-
-            val fraction = (value / 1000f).coerceIn(0f, 1f)
-            lastSeekValue = fraction // Sauvegarder la dernière valeur de seek
-
-            coroutineScope.launch {
-                seekInProgress = true
-                try {
-                    logger.log("Setting slider position: $value => fraction=$fraction")
-                    if (mediaSlider.setProgress(fraction)) {
-                        _progress = fraction
-                        _currentTime = _duration * fraction
-                        logger.log("Seek success => new progress=$fraction")
-
-                        // Attendre un peu pour que la position se stabilise
-                        delay(50)
-
-                        // Vérifier si la position est correcte
-                        mediaSlider.getCurrentPositionInSeconds()?.let { position ->
-                            val actualProgress = (position / _duration).toFloat()
-                            if (kotlin.math.abs(actualProgress - fraction) > 0.01f) {
-                                // Réessayer le seek si la position n'est pas correcte
-                                mediaSlider.setProgress(fraction)
-                            }
-                        }
-                    } else {
-                        logger.error("Seek failed => setProgress returned false")
-                    }
-                } catch (e: Exception) {
-                    logger.error("Error during seek: ${e.message}")
-                } finally {
-                    delay(100) // Attendre que la position se stabilise
-                    seekInProgress = false
-                }
-            }
+            _progress = (value / 1000f).coerceIn(0f, 1f)
         }
 
-
-
+    // Indicates if the user is dragging the slider
     private var _userDragging by mutableStateOf(false)
     override var userDragging: Boolean
         get() = _userDragging
-        set(value) { _userDragging = value }
+        set(value) {
+            if (_userDragging && !value) {
+                applySeek()
+            }
+            _userDragging = value
+        }
 
     private var _loop by mutableStateOf(false)
     override var loop: Boolean
@@ -124,11 +96,100 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         private set
 
     private var _error: VideoPlayerError? by mutableStateOf(null)
-    override val error: VideoPlayerError? get() = _error
+    override val error: VideoPlayerError?
+        get() = _error
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    // Initialize the player with a Canvas
+    fun initializeWithCanvas(canvas: Canvas) = coroutineScope.launch {
+        if (isInitialized) return@launch
+
+        try {
+            val hwnd = Native.getComponentPointer(canvas) ?: run {
+                logger.error("Null HWND, Canvas not displayable?")
+                return@launch
+            }
+
+            withContext(Dispatchers.Main) {
+                if (!canvas.isDisplayable) {
+                    canvas.createBufferStrategy(1)
+                }
+                val callback = MediaPlayerLib.MediaPlayerCallback(::onMediaEvent)
+                val hr = mediaPlayer.InitializeMediaPlayer(WinDef.HWND(hwnd), callback)
+                if (hr < 0) {
+                    handleError("MediaPlayer initialization failed (HR=0x${hr.toString(16)})")
+                    return@withContext
+                }
+
+                videoCanvas = canvas
+                isInitialized = true
+                startVideoUpdates()
+                logger.log("Player initialized.")
+            }
+        } catch (e: Exception) {
+            handleError("Initialization error: ${e.message}")
+        }
+    }
+
+    override fun openUri(uri: String) {
+        if (!isInitialized) {
+            handleError("Player not initialized")
+            return
+        }
+        resetState()
+
+        try {
+            val hr = when {
+                uri.startsWith("http", ignoreCase = true) -> mediaPlayer.PlayURL(WString(uri))
+                else -> {
+                    val file = File(uri)
+                    if (!file.exists()) throw FileNotFoundException("File not found: $uri")
+                    mediaPlayer.PlayFile(WString(file.absolutePath))
+                }
+            }
+            if (hr < 0) {
+                handleError("Unable to open (HR=0x${hr.toString(16)})")
+                return
+            }
+            startLoadingTimeout()
+
+        } catch (e: Exception) {
+            handleError("openUri error: ${e.message}")
+        }
+    }
+
+    override fun play() = mediaOperation("resume playback") { mediaPlayer.ResumePlayback() }
+    override fun pause() = mediaOperation("pause") { mediaPlayer.PausePlayback() }
+    override fun stop() = mediaOperation("stop playback") { mediaPlayer.StopPlayback() }
+
+    override fun seekTo(value: Float) {
+        sliderPos = value
+        applySeek()
+    }
+
+    override fun dispose() {
+        if (!isInitialized) return
+        loadingTimeoutJob?.cancel()
+        try {
+            mediaPlayer.StopPlayback()
+            mediaPlayer.CleanupMediaPlayer()
+        } catch (e: Exception) {
+            logger.error("Cleanup error: ${e.message}")
+        } finally {
+            cleanupState()
+        }
+    }
+
+    override fun clearError() {
+        errorMessage = null
+        _error = null
+    }
+
+    // ------------------------------
+    // Video update logic
+    // ------------------------------
     private fun startVideoUpdates() {
         videoUpdateJob?.cancel()
         videoUpdateJob = coroutineScope.launch {
@@ -138,134 +199,43 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                     delay(UPDATE_INTERVAL)
                 }
             }
-                .flowOn(Dispatchers.Default)
-                .filter { isInitialized && !userDragging }
                 .onEach {
-                    withContext(Dispatchers.Main) {
-                        updateVideo()
-                        val oldProgress = _progress
-                        updateProgress()
-                        if (kotlin.math.abs(_progress - oldProgress) > 0.01f) {
-                            logger.log("Progress changed: $oldProgress -> $_progress")
+                    if (isInitialized) {
+                        mediaPlayer.UpdateVideo() // Redraw video frame
+                        if (!_userDragging) {
+                            updateProgressFromPlayer()
                         }
                     }
-                }
-                .catch { e ->
-                    logger.error("Error in video updates: ${e.message}")
                 }
                 .collect()
         }
     }
 
-    private fun updateProgress() {
-        if (seekInProgress || !mediaPlayer.IsInitialized()) return
-
+    private fun updateProgressFromPlayer() {
+        if (!mediaPlayer.IsInitialized()) return
         try {
-            mediaSlider.getDurationInSeconds()?.let { duration ->
-                if (duration > 0.0) {
-                    _duration = duration
-                    mediaSlider.getCurrentPositionInSeconds()?.let { position ->
-                        _currentTime = position
-                        val newProgress = (_currentTime / _duration).toFloat().coerceIn(0f, 1f)
-
-                        // Ne mettre à jour que si la différence est significative
-                        // et qu'il n'y a pas de seek en cours
-                        if (kotlin.math.abs(_progress - newProgress) > 0.01f) {
-                            // Vérifier si la position n'est pas revenue à 0 après un seek
-                            if (newProgress == 0f && lastSeekValue > 0f) {
-                                // Réappliquer le dernier seek
-                                mediaSlider.setProgress(lastSeekValue)
-                                return
-                            }
-
-                            _progress = newProgress
-                            logger.log("Progress updated: $_progress (time: $_currentTime / $_duration)")
-                        }
+            mediaSlider.getDurationInSeconds()?.let { dur ->
+                if (dur > 0.0) {
+                    _duration = dur
+                    mediaSlider.getCurrentPositionInSeconds()?.let { pos ->
+                        _currentTime = pos
+                        _progress = (pos / dur).toFloat().coerceIn(0f, 1f)
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.error("Error updating progress: ${e.message}")
-        }
-
-    }
-
-    fun initializeWithCanvas(canvas: Canvas) = coroutineScope.launch {
-        if (isInitialized) {
-            logger.log("Player is already initialized")
-            return@launch
-        }
-
-        try {
-            val hwnd = Native.getComponentPointer(canvas) ?: run {
-                logger.error("initializeWithCanvas: NULL HWND, Canvas not displayable")
-                return@launch
-            }
-
-            withContext(Dispatchers.Main) {
-                if (!canvas.isDisplayable) {
-                    canvas.createBufferStrategy(1)
-                }
-
-                val callback = MediaPlayerLib.MediaPlayerCallback(::onMediaEvent)
-
-                mediaPlayer.InitializeMediaPlayer(WinDef.HWND(hwnd), callback).let { hr ->
-                    if (hr < 0) {
-                        handleError("Initialization failed (HR=0x${hr.toString(16)})")
-                        return@withContext
-                    }
-
-                    videoCanvas = canvas
-                    isInitialized = true
-                    startVideoUpdates()
-                    logger.log("Player successfully initialized")
-                }
-            }
-        } catch (e: Exception) {
-            handleError("Initialization error: ${e.message}")
+            logger.error("Update progress error: ${e.message}")
         }
     }
 
-    override fun openUri(uri: String) {
-        if (!isInitialized) {
-            handleError("Media player not initialized")
-            return
-        }
-
-        resetState()
-
-        try {
-            val hr =
-                when {
-                    uri.startsWith("http", ignoreCase = true) -> {
-                        logger.log("Opening URL: $uri")
-                        mediaPlayer.PlayURL(WString(uri))
-                    }
-                    else -> {
-                        val file = File(uri).absoluteFile
-                        if (!file.exists()) throw FileNotFoundException("File does not exist: $uri")
-                        logger.log("Opening file: ${file.absolutePath}")
-                        mediaPlayer.PlayFile(WString(file.absolutePath))
-                    }
-                }
-
-            if (hr < 0) {
-                handleError("Unable to open media (HR=0x${hr.toString(16)})")
-                return
-            }
-
-            startLoadingTimeout()
-        } catch (e: Exception) {
-            handleError("Error opening media: ${e.message}")
-        }
-    }
-
-    private fun startLoadingTimeout() {
-        loadingTimeoutJob?.cancel()
-        loadingTimeoutJob = coroutineScope.launch {
-            delay(LOADING_TIMEOUT)
-            if (isLoading) {
-                handleError("Timeout while loading media")
+    private fun applySeek() {
+        if (!isInitialized) return
+        coroutineScope.launch {
+            try {
+                mediaSlider.setProgress(_progress)
+                _currentTime = _duration * _progress
+            } catch (e: Exception) {
+                logger.error("Apply seek error: ${e.message}")
             }
         }
     }
@@ -278,61 +248,15 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _currentTime = 0.0
         _duration = 0.0
         _progress = 0f
-        lastSeekValue = 0f
-        seekInProgress = false
     }
 
-    override fun play() = mediaOperation("start playback") { mediaPlayer.ResumePlayback() }
-    override fun pause() = mediaOperation("pause playback") { mediaPlayer.PausePlayback() }
-    override fun stop() = mediaOperation("stop playback") { mediaPlayer.StopPlayback() }
-
-    private fun mediaOperation(operation: String, block: () -> Int) {
-        if (!isInitialized) return
-
-        val hr = block()
-        if (hr < 0) {
-            handleError("Unable to $operation (HR=0x${hr.toString(16)})")
-        }
-    }
-
-    override fun seekTo(value: Float) {
-        if (!isInitialized) return
-
-        val fraction = (value / 1000f).coerceIn(0f, 1f)
-        lastSeekValue = fraction // Sauvegarder la valeur du seek
-
-        coroutineScope.launch {
-            seekInProgress = true
-            try {
-                if (mediaSlider.setProgress(fraction)) {
-                    _progress = fraction
-                    _currentTime = _duration * fraction
-                    logger.log("SeekTo($value) => fraction=$fraction => OK")
-                } else {
-                    logger.error("SeekTo($value) => fraction=$fraction => FAILED")
-                }
-            } catch (e: Exception) {
-                logger.error("Error during seek: ${e.message}")
-            } finally {
-                delay(100)
-                seekInProgress = false
-            }
-        }
-    }
-
-
-    override fun dispose() {
-        if (!isInitialized) return
-
+    private fun startLoadingTimeout() {
         loadingTimeoutJob?.cancel()
-
-        try {
-            mediaPlayer.StopPlayback()
-            mediaPlayer.CleanupMediaPlayer()
-        } catch (e: Exception) {
-            logger.error("Error during cleanup: ${e.message}")
-        } finally {
-            cleanupState()
+        loadingTimeoutJob = coroutineScope.launch {
+            delay(LOADING_TIMEOUT)
+            if (isLoading) {
+                handleError("Video loading timeout.")
+            }
         }
     }
 
@@ -343,27 +267,26 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _duration = 0.0
         _progress = 0f
         videoCanvas = null
-        logger.log("Player cleaned up")
+        logger.log("Player cleaned up.")
     }
 
-    override fun clearError() {
-        errorMessage = null
-        _error = null
-    }
-
-    fun updateVideo() {
-        if (isInitialized) {
-            mediaPlayer.UpdateVideo()
+    private fun mediaOperation(name: String, block: () -> Int) {
+        if (!isInitialized) return
+        val hr = block()
+        if (hr < 0) {
+            handleError("Unable to $name (HR=0x${hr.toString(16)})")
         }
     }
 
+    // ------------------------------
+    // MediaPlayer events
+    // ------------------------------
     private fun onMediaEvent(eventType: Int, hr: Int) {
-        logger.log("Event: $eventType (HR=0x${hr.toString(16)})")
-
+        logger.log("onMediaEvent: $eventType (HR=0x${hr.toString(16)})")
         when (eventType) {
-            MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> updateProgress()
+            MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> updateProgressFromPlayer()
             MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
-            MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> { _isPlaying = false }
+            MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> _isPlaying = false
             MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
             MediaPlayerLib.MP_EVENT_LOADING_STARTED -> handleLoadingStarted()
@@ -382,7 +305,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         isLoading = false
         _currentTime = 0.0
         _progress = 0f
-
         if (loop) {
             mediaSlider.setProgress(0f)
             play()
@@ -398,13 +320,13 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
     private fun handleLoadingStarted() {
         isLoading = true
-        logger.log("Loading started")
+        logger.log("Loading started…")
     }
 
     private fun handleLoadingComplete() {
         loadingTimeoutJob?.cancel()
         isLoading = false
-        logger.log("Loading complete")
+        logger.log("Loading complete.")
     }
 
     private fun handleError(message: String) {
@@ -413,13 +335,17 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         logger.error(message)
     }
 
+    // Format hh:mm:ss or mm:ss
     private fun formatTime(value: Double): String {
         val duration = Duration.ofSeconds(value.toLong())
-        return duration.toHours().let { hours ->
-            when {
-                hours > 0 -> "%02d:%02d:%02d".format(hours, duration.toMinutesPart(), duration.toSecondsPart())
-                else -> "%02d:%02d".format(duration.toMinutesPart(), duration.toSecondsPart())
-            }
+        val hours = duration.toHours().toInt()
+        val minutes = duration.toMinutesPart()
+        val seconds = duration.toSecondsPart()
+
+        return if (hours > 0) {
+            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format("%02d:%02d", minutes, seconds)
         }
     }
 }
