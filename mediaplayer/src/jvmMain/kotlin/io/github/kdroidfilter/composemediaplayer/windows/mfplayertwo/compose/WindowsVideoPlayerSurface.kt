@@ -26,6 +26,5 @@ fun WindowsVideoPlayerSurface(
                 }
             }
         )
-
     }
 }

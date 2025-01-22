@@ -25,8 +25,8 @@ fun LinuxVideoPlayerSurface(
 ) {
     Box(modifier = modifier) {
         SwingPanel(
+            modifier = Modifier.fillMaxSize(),
             factory = { playerState.gstVideoComponent },
-            modifier = Modifier.fillMaxSize()
         )
     }
 }
