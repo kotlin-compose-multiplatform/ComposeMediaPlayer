@@ -48,7 +48,14 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
     private var _isPlaying by mutableStateOf(false)
     override val isPlaying: Boolean
-        get() = _isPlaying
+        get() {
+            if (!isInitialized || isLoading) return false
+            // Vérifie si on a atteint la fin de la vidéo
+            if (_duration > 0 && _currentTime >= _duration && !_loop) {
+                return false
+            }
+            return mediaPlayer.IsPlaying()
+        }
 
     private var _volume by mutableStateOf(1f)
     override var volume: Float
@@ -160,7 +167,19 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    override fun play() = mediaOperation("resume playback") { mediaPlayer.ResumePlayback() }
+    override fun play() {
+        if (_currentTime >= _duration && !_loop) {
+            // Si on est à la fin, recommencer depuis le début
+            coroutineScope.launch {
+                mediaSlider.setProgress(0f)
+                _currentTime = 0.0
+                _progress = 0f
+                mediaOperation("resume playback") { mediaPlayer.ResumePlayback() }
+            }
+        } else {
+            mediaOperation("resume playback") { mediaPlayer.ResumePlayback() }
+        }
+    }
     override fun pause() = mediaOperation("pause") { mediaPlayer.PausePlayback() }
     override fun stop() = mediaOperation("stop playback") { mediaPlayer.StopPlayback() }
 
@@ -220,6 +239,11 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                     mediaSlider.getCurrentPositionInSeconds()?.let { pos ->
                         _currentTime = pos
                         _progress = (pos / dur).toFloat().coerceIn(0f, 1f)
+
+                        // Détecte si on a atteint la fin de la vidéo
+                        if (pos >= dur) {
+                            handlePlaybackEnded()
+                        }
                     }
                 }
             }
@@ -291,10 +315,16 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
             MediaPlayerLib.MP_EVENT_LOADING_STARTED -> handleLoadingStarted()
             MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> handleLoadingComplete()
+            MediaPlayerLib.MP_EVENT_PLAYBACK_ENDED -> handlePlaybackEnded()
         }
     }
 
     private fun handlePlaybackStarted() {
+        if (_currentTime >= _duration && !_loop) {
+            // Si on essaie de lire après la fin sans boucle
+            stop()
+            return
+        }
         _isPlaying = true
         isLoading = false
         loadingTimeoutJob?.cancel()
@@ -303,11 +333,15 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private fun handlePlaybackStopped() {
         _isPlaying = false
         isLoading = false
-        _currentTime = 0.0
-        _progress = 0f
-        if (loop) {
-            mediaSlider.setProgress(0f)
-            play()
+
+        // Ne réinitialise la position que si ce n'est pas une fin naturelle
+        if (_currentTime < _duration || _loop) {
+            _currentTime = 0.0
+            _progress = 0f
+            if (_loop) {
+                mediaSlider.setProgress(0f)
+                play()
+            }
         }
     }
 
@@ -327,6 +361,18 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         loadingTimeoutJob?.cancel()
         isLoading = false
         logger.log("Loading complete.")
+    }
+
+    private fun handlePlaybackEnded() {
+        _isPlaying = false
+        if (_loop) {
+            coroutineScope.launch {
+                mediaSlider.setProgress(0f)
+                _currentTime = 0.0
+                _progress = 0f
+                play()
+            }
+        }
     }
 
     private fun handleError(message: String) {

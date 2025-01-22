@@ -45,6 +45,7 @@ extern "C" {
 #define MP_EVENT_PLAYBACK_PAUSED      6
 #define MP_EVENT_LOADING_STARTED      7
 #define MP_EVENT_LOADING_COMPLETE     8
+#define MP_EVENT_PLAYBACK_ENDED       9
 
 // Some internal error codes (example)
 #define MP_E_NOT_INITIALIZED     ((HRESULT)0x80000001L)
@@ -68,6 +69,8 @@ MEDIAPLAYER_API void    CleanupMediaPlayer();
 MEDIAPLAYER_API BOOL    IsInitialized();
 MEDIAPLAYER_API BOOL    HasVideo();
 MEDIAPLAYER_API BOOL    IsLoading();
+    MEDIAPLAYER_API BOOL    IsPlaying();
+
 
 // Volume
 MEDIAPLAYER_API HRESULT SetVolume(float level);    // niveau entre 0.0 et 1.0

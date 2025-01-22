@@ -285,7 +285,7 @@ HRESULT SetPosition(LONGLONG position)
     return hr;
 }
 
-// =============== Loading State ======================
+// =============== Player State ======================
 
 
 BOOL IsLoading()
@@ -294,6 +294,14 @@ BOOL IsLoading()
     BOOL isLoading = g_state.isLoading;
     LeaveCriticalSection(&g_state.lock);
     return isLoading;
+}
+
+BOOL IsPlaying()
+{
+    EnterCriticalSection(&g_state.lock);
+    BOOL isPlaying = g_state.isPlaying;
+    LeaveCriticalSection(&g_state.lock);
+    return isPlaying;
 }
 
 // =============== MFPlay Callback Class ======================
@@ -323,83 +331,114 @@ public:
         return count;
     }
 
-    void STDMETHODCALLTYPE OnMediaPlayerEvent(MFP_EVENT_HEADER* pEventHeader) override {
-        if (!pEventHeader) return;
+void STDMETHODCALLTYPE OnMediaPlayerEvent(MFP_EVENT_HEADER* pEventHeader) override {
+    if (!pEventHeader) return;
 
-        EnterCriticalSection(&g_state.lock);
+    EnterCriticalSection(&g_state.lock);
 
-        if (!g_state.userCallback) {
-            LeaveCriticalSection(&g_state.lock);
-            return;
-        }
+    if (!g_state.userCallback) {
+        LeaveCriticalSection(&g_state.lock);
+        return;
+    }
 
-        if (FAILED(pEventHeader->hrEvent)) {
-            // Notify an error occurred
-            g_state.isPlaying = false;
-            g_state.isLoading = false;
-            g_state.userCallback(MP_EVENT_PLAYBACK_ERROR, pEventHeader->hrEvent);
-            LeaveCriticalSection(&g_state.lock);
-            return;
-        }
+    if (FAILED(pEventHeader->hrEvent)) {
+        // Notify an error occurred
+        g_state.isPlaying = false;
+        g_state.isLoading = false;
+        g_state.userCallback(MP_EVENT_PLAYBACK_ERROR, pEventHeader->hrEvent);
+        LeaveCriticalSection(&g_state.lock);
+        return;
+    }
 
-        switch (pEventHeader->eEventType) {
-        case MFP_EVENT_TYPE_MEDIAITEM_CREATED:
-        {
-            auto pEvent = MFP_GET_MEDIAITEM_CREATED_EVENT(pEventHeader);
-            LogDebugW(L"[Callback] MFP_EVENT_TYPE_MEDIAITEM_CREATED\n");
+    switch (pEventHeader->eEventType) {
+    case MFP_EVENT_TYPE_MEDIAITEM_CREATED:
+    {
+        auto pEvent = MFP_GET_MEDIAITEM_CREATED_EVENT(pEventHeader);
+        LogDebugW(L"[Callback] MFP_EVENT_TYPE_MEDIAITEM_CREATED\n");
 
-            if (SUCCEEDED(pEventHeader->hrEvent) && pEvent && pEvent->pMediaItem) {
-                BOOL bHasVideo = FALSE, bIsSelected = FALSE;
-                HRESULT hr = pEvent->pMediaItem->HasVideo(&bHasVideo, &bIsSelected);
-                if (SUCCEEDED(hr)) {
-                    g_state.hasVideo = (bHasVideo && bIsSelected);
-                    if (g_state.player) {
-                        g_state.player->SetMediaItem(pEvent->pMediaItem);
-                    }
+        if (SUCCEEDED(pEventHeader->hrEvent) && pEvent && pEvent->pMediaItem) {
+            BOOL bHasVideo = FALSE, bIsSelected = FALSE;
+            HRESULT hr = pEvent->pMediaItem->HasVideo(&bHasVideo, &bIsSelected);
+            if (SUCCEEDED(hr)) {
+                g_state.hasVideo = (bHasVideo && bIsSelected);
+                if (g_state.player) {
+                    g_state.player->SetMediaItem(pEvent->pMediaItem);
                 }
             }
-            g_state.userCallback(MP_EVENT_MEDIAITEM_CREATED, pEventHeader->hrEvent);
-            break;
         }
-        case MFP_EVENT_TYPE_MEDIAITEM_SET:
-        {
-            LogDebugW(L"[Callback] MFP_EVENT_TYPE_MEDIAITEM_SET\n");
-            g_state.isLoading = false;
-            g_state.userCallback(MP_EVENT_MEDIAITEM_SET, pEventHeader->hrEvent);
-
-            // Start playback immediately
-            if (g_state.player) {
-                g_state.player->Play();
-                g_state.isPlaying = true;
-            }
-            break;
-        }
-            case MFP_EVENT_TYPE_PLAY:
-                LogDebugW(L"[Callback] MFP_EVENT_TYPE_PLAY -> PLAYBACK_STARTED\n");
-            g_state.isPlaying = true;
-            g_state.userCallback(MP_EVENT_PLAYBACK_STARTED, pEventHeader->hrEvent);
-            break;
-
-            case MFP_EVENT_TYPE_PAUSE:  // Handle PAUSE separately from STOP
-                LogDebugW(L"[Callback] MFP_EVENT_TYPE_PAUSE -> PLAYBACK_PAUSED\n");
-            g_state.isPlaying = false;
-            g_state.userCallback(MP_EVENT_PLAYBACK_PAUSED, pEventHeader->hrEvent); // Add new event type
-            break;
-
-            case MFP_EVENT_TYPE_STOP:
-                LogDebugW(L"[Callback] MFP_EVENT_TYPE_STOP -> PLAYBACK_STOPPED\n");
-            g_state.isPlaying = false;
-            g_state.userCallback(MP_EVENT_PLAYBACK_STOPPED, pEventHeader->hrEvent);
-            break;
-
-        case MFP_EVENT_TYPE_ERROR:
-            // Handled earlier with FAILED()
-            break;
-        }
-
-        LeaveCriticalSection(&g_state.lock);
+        g_state.userCallback(MP_EVENT_MEDIAITEM_CREATED, pEventHeader->hrEvent);
+        break;
     }
-};
+    case MFP_EVENT_TYPE_MEDIAITEM_SET:
+    {
+        LogDebugW(L"[Callback] MFP_EVENT_TYPE_MEDIAITEM_SET\n");
+        g_state.isLoading = false;
+        g_state.userCallback(MP_EVENT_MEDIAITEM_SET, pEventHeader->hrEvent);
+
+        // Start playback immediately
+        if (g_state.player) {
+            g_state.player->Play();
+            g_state.isPlaying = true;
+        }
+        break;
+    }
+    case MFP_EVENT_TYPE_PLAY:
+        LogDebugW(L"[Callback] MFP_EVENT_TYPE_PLAY -> PLAYBACK_STARTED\n");
+        g_state.isPlaying = true;
+        g_state.userCallback(MP_EVENT_PLAYBACK_STARTED, pEventHeader->hrEvent);
+        break;
+
+    case MFP_EVENT_TYPE_PAUSE:
+        LogDebugW(L"[Callback] MFP_EVENT_TYPE_PAUSE -> PLAYBACK_PAUSED\n");
+        g_state.isPlaying = false;
+        g_state.userCallback(MP_EVENT_PLAYBACK_PAUSED, pEventHeader->hrEvent);
+        break;
+
+    case MFP_EVENT_TYPE_STOP:
+        LogDebugW(L"[Callback] MFP_EVENT_TYPE_STOP -> PLAYBACK_STOPPED\n");
+        g_state.isPlaying = false;
+        g_state.userCallback(MP_EVENT_PLAYBACK_STOPPED, pEventHeader->hrEvent);
+        break;
+
+    case MFP_EVENT_TYPE_POSITION_SET:
+    {
+        // Vérifie si nous avons atteint la fin du média
+        PROPVARIANT var;
+        PropVariantInit(&var);
+
+        LONGLONG duration = 0;
+        LONGLONG position = 0;
+
+        if (SUCCEEDED(g_state.player->GetDuration(MFP_POSITIONTYPE_100NS, &var))) {
+            duration = var.hVal.QuadPart;
+            PropVariantClear(&var);
+
+            if (SUCCEEDED(g_state.player->GetPosition(MFP_POSITIONTYPE_100NS, &var))) {
+                position = var.hVal.QuadPart;
+                PropVariantClear(&var);
+
+                if (position >= duration) {
+                    LogDebugW(L"[Callback] End of media detected\n");
+                    g_state.isPlaying = false;
+                    g_state.userCallback(MP_EVENT_PLAYBACK_ENDED, S_OK);
+                }
+            }
+        }
+        break;
+    }
+
+    case MFP_EVENT_TYPE_ERROR:
+        // Handled earlier with FAILED()
+        break;
+
+    default:
+        // Log unhandled event type if needed
+        LogDebugW(L"[Callback] Unhandled event type: %d\n", pEventHeader->eEventType);
+        break;
+    }
+
+    LeaveCriticalSection(&g_state.lock);
+}};
 
 // Keep a global pointer to our callback
 static MediaPlayerCallback* g_pCallback = nullptr;
