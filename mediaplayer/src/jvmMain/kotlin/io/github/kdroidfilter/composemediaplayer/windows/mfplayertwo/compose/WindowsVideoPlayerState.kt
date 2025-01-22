@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class WindowsVideoPlayerState : PlatformVideoPlayerState {
     companion object {
-        private const val UPDATE_INTERVAL = 60L
+        private const val UPDATE_INTERVAL = 16L  // ~60fps to match Android
         private val LOADING_TIMEOUT = 10.seconds
         private val logger = Logger("WindowsVideoPlayerState")
     }
@@ -57,33 +57,51 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private var _duration by mutableStateOf(0.0)
     private var _progress by mutableStateOf(0f)
 
+    private var pendingSeek: Float? = null
+    private var seekInProgress = false
+    private var lastSeekValue: Float = 0f
+
+
     override var sliderPos: Float
-        // Convert internal 0..1 progress to 0..1000 for UI
         get() = _progress * 1000f
         set(value) {
             if (!isInitialized) return
 
-            // Convert UI 0..1000 to internal 0..1
             val fraction = (value / 1000f).coerceIn(0f, 1f)
+            lastSeekValue = fraction // Sauvegarder la dernière valeur de seek
 
             coroutineScope.launch {
-                userDragging = true
+                seekInProgress = true
                 try {
                     logger.log("Setting slider position: $value => fraction=$fraction")
                     if (mediaSlider.setProgress(fraction)) {
                         _progress = fraction
                         _currentTime = _duration * fraction
                         logger.log("Seek success => new progress=$fraction")
+
+                        // Attendre un peu pour que la position se stabilise
+                        delay(50)
+
+                        // Vérifier si la position est correcte
+                        mediaSlider.getCurrentPositionInSeconds()?.let { position ->
+                            val actualProgress = (position / _duration).toFloat()
+                            if (kotlin.math.abs(actualProgress - fraction) > 0.01f) {
+                                // Réessayer le seek si la position n'est pas correcte
+                                mediaSlider.setProgress(fraction)
+                            }
+                        }
                     } else {
                         logger.error("Seek failed => setProgress returned false")
                     }
                 } catch (e: Exception) {
                     logger.error("Error during seek: ${e.message}")
                 } finally {
-                    userDragging = false
+                    delay(100) // Attendre que la position se stabilise
+                    seekInProgress = false
                 }
             }
         }
+
 
 
     private var _userDragging by mutableStateOf(false)
@@ -111,7 +129,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    // Video update flow
     private fun startVideoUpdates() {
         videoUpdateJob?.cancel()
         videoUpdateJob = coroutineScope.launch {
@@ -126,7 +143,11 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 .onEach {
                     withContext(Dispatchers.Main) {
                         updateVideo()
+                        val oldProgress = _progress
                         updateProgress()
+                        if (kotlin.math.abs(_progress - oldProgress) > 0.01f) {
+                            logger.log("Progress changed: $oldProgress -> $_progress")
+                        }
                     }
                 }
                 .catch { e ->
@@ -137,23 +158,36 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     }
 
     private fun updateProgress() {
-        if (!userDragging && mediaPlayer.IsInitialized()) {
-            try {
-                mediaSlider.getDurationInSeconds()?.let { duration ->
-                    if (duration > 0.0) {
-                        _duration = duration
-                        mediaSlider.getCurrentPositionInSeconds()?.let { position ->
-                            _currentTime = position
-                            // Store progress as 0..1 internally
-                            _progress = (_currentTime / _duration).toFloat().coerceIn(0f, 1f)
+        if (seekInProgress || !mediaPlayer.IsInitialized()) return
+
+        try {
+            mediaSlider.getDurationInSeconds()?.let { duration ->
+                if (duration > 0.0) {
+                    _duration = duration
+                    mediaSlider.getCurrentPositionInSeconds()?.let { position ->
+                        _currentTime = position
+                        val newProgress = (_currentTime / _duration).toFloat().coerceIn(0f, 1f)
+
+                        // Ne mettre à jour que si la différence est significative
+                        // et qu'il n'y a pas de seek en cours
+                        if (kotlin.math.abs(_progress - newProgress) > 0.01f) {
+                            // Vérifier si la position n'est pas revenue à 0 après un seek
+                            if (newProgress == 0f && lastSeekValue > 0f) {
+                                // Réappliquer le dernier seek
+                                mediaSlider.setProgress(lastSeekValue)
+                                return
+                            }
+
+                            _progress = newProgress
                             logger.log("Progress updated: $_progress (time: $_currentTime / $_duration)")
                         }
                     }
                 }
-            } catch (e: Exception) {
-                logger.error("Error updating progress: ${e.message}")
             }
+        } catch (e: Exception) {
+            logger.error("Error updating progress: ${e.message}")
         }
+
     }
 
     fun initializeWithCanvas(canvas: Canvas) = coroutineScope.launch {
@@ -195,6 +229,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override fun openUri(uri: String) {
         if (!isInitialized) {
             handleError("Media player not initialized")
+            return
         }
 
         resetState()
@@ -213,7 +248,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                         mediaPlayer.PlayFile(WString(file.absolutePath))
                     }
                 }
-
 
             if (hr < 0) {
                 handleError("Unable to open media (HR=0x${hr.toString(16)})")
@@ -244,6 +278,8 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _currentTime = 0.0
         _duration = 0.0
         _progress = 0f
+        lastSeekValue = 0f
+        seekInProgress = false
     }
 
     override fun play() = mediaOperation("start playback") { mediaPlayer.ResumePlayback() }
@@ -262,9 +298,12 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override fun seekTo(value: Float) {
         if (!isInitialized) return
 
+        val fraction = (value / 1000f).coerceIn(0f, 1f)
+        lastSeekValue = fraction // Sauvegarder la valeur du seek
+
         coroutineScope.launch {
+            seekInProgress = true
             try {
-                val fraction = (value / 1000f).coerceIn(0f, 1f)
                 if (mediaSlider.setProgress(fraction)) {
                     _progress = fraction
                     _currentTime = _duration * fraction
@@ -274,24 +313,27 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 }
             } catch (e: Exception) {
                 logger.error("Error during seek: ${e.message}")
+            } finally {
+                delay(100)
+                seekInProgress = false
             }
         }
     }
 
+
     override fun dispose() {
         if (!isInitialized) return
 
-                 loadingTimeoutJob?.cancel()
+        loadingTimeoutJob?.cancel()
 
-            try {
-                mediaPlayer.StopPlayback()
-                mediaPlayer.CleanupMediaPlayer()
-            } catch (e: Exception) {
-                logger.error("Error during cleanup: ${e.message}")
-            } finally {
-                cleanupState()
-            }
-
+        try {
+            mediaPlayer.StopPlayback()
+            mediaPlayer.CleanupMediaPlayer()
+        } catch (e: Exception) {
+            logger.error("Error during cleanup: ${e.message}")
+        } finally {
+            cleanupState()
+        }
     }
 
     private fun cleanupState() {
@@ -380,6 +422,4 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             }
         }
     }
-
-
 }
