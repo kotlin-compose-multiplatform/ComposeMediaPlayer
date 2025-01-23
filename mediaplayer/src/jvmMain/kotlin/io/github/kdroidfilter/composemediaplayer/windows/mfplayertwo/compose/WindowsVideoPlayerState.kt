@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
+import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
@@ -26,6 +27,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
 
     companion object {
         private const val UPDATE_INTERVAL = 60L  // ~60 FPS
+        private const val AUDIO_UPDATE_INTERVAL = 50L
         private val LOADING_TIMEOUT = 10.seconds
         private val logger = Logger("WindowsVideoPlayerState")
     }
@@ -93,8 +95,13 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         get() = _loop
         set(value) { _loop = value }
 
-    override val leftLevel: Float get() = 0f
-    override val rightLevel: Float get() = 0f
+    private var audioLevelsJob: Job? = null
+
+    private var _leftLevel by mutableStateOf(0f)
+    private var _rightLevel by mutableStateOf(0f)
+
+    override val leftLevel: Float get() = _leftLevel
+    override val rightLevel: Float get() = _rightLevel
 
     override val positionText: String get() = formatTime(_currentTime)
     override val durationText: String get() = formatTime(_duration)
@@ -133,6 +140,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 videoCanvas = canvas
                 isInitialized = true
                 startVideoUpdates()
+                startAudioLevelsUpdate()
                 logger.log("Player initialized.")
             }
         } catch (e: Exception) {
@@ -191,6 +199,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override fun dispose() {
         if (!isInitialized) return
         loadingTimeoutJob?.cancel()
+        audioLevelsJob?.cancel()
         try {
             mediaPlayer.StopPlayback()
             mediaPlayer.CleanupMediaPlayer()
@@ -326,6 +335,54 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     }
 
     // ------------------------------
+    // Audio levels update logic
+    // ------------------------------
+
+    private fun startAudioLevelsUpdate() {
+        audioLevelsJob?.cancel()
+        audioLevelsJob = coroutineScope.launch {
+            flow {
+                while (currentCoroutineContext().isActive) {
+                    emit(Unit)
+                    delay(AUDIO_UPDATE_INTERVAL)
+                }
+            }
+                .onEach {
+                    if (isInitialized && !isLoading && isPlaying) {
+                        updateAudioLevels()
+                    } else {
+                        _leftLevel = 0f
+                        _rightLevel = 0f
+                    }
+                }
+                .collect()
+        }
+    }
+
+    private fun updateAudioLevels() {
+        try {
+            val leftRef = FloatByReference()
+            val rightRef = FloatByReference()
+
+            val hr = mediaPlayer.GetChannelLevels(leftRef, rightRef)
+            if (hr == 0) {
+                // Convertir les valeurs en pourcentage (0-100)
+                _leftLevel = (leftRef.value * 100f).coerceIn(0f, 100f)
+                _rightLevel = (rightRef.value * 100f).coerceIn(0f, 100f)
+//                logger.log("Audio levels - Left: $_leftLevel%, Right: $_rightLevel%")
+            } else {
+                logger.error("GetChannelLevels failed with HR=0x${hr.toString(16)}")
+                _leftLevel = 0f
+                _rightLevel = 0f
+            }
+        } catch (e: Exception) {
+            logger.error("Error updating audio levels: ${e.message}")
+            _leftLevel = 0f
+            _rightLevel = 0f
+        }
+    }
+
+    // ------------------------------
     // MediaPlayer events
     // ------------------------------
     private fun onMediaEvent(eventType: Int, hr: Int) {
@@ -357,11 +414,15 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _isPlaying = true
         isLoading = false
         loadingTimeoutJob?.cancel()
+        _leftLevel = 0f  // Réinitialiser les niveaux audio
+        _rightLevel = 0f
     }
 
     private fun handlePlaybackStopped() {
         _isPlaying = false
         isLoading = false
+        _leftLevel = 0f  // Réinitialiser les niveaux audio
+        _rightLevel = 0f
 
         // Ne réinitialise la position que si ce n'est pas une fin naturelle
         if (_currentTime < _duration || _loop) {

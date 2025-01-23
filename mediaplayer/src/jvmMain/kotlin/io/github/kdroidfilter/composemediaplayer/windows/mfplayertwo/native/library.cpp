@@ -11,6 +11,8 @@
 #include <atomic>
 #include <Audiopolicy.h>
 #include <Mmdeviceapi.h>
+#include <endpointvolume.h>
+#include <vector>
 
 // =============== Structures and Global Variables ====================
 
@@ -25,6 +27,8 @@ struct PlayerState {
     CRITICAL_SECTION      lock;
     ISimpleAudioVolume* audioVolume;  // Pour le contrôle du volume
     IAudioSessionControl* audioSession;  // Pour le contrôle de session audio
+    IAudioMeterInformation* audioMeter;   // <-- Nouvel ajout pour récupérer le niveau par canal
+
 };
 
 
@@ -283,6 +287,136 @@ HRESULT SetPosition(LONGLONG position)
     PropVariantClear(&var);
     LeaveCriticalSection(&g_state.lock);
     return hr;
+}
+
+// =============== Audio Level ======================
+
+HRESULT InitializeAudioMetering()
+{
+    HRESULT hr = S_OK;
+    EnterCriticalSection(&g_state.lock);
+
+    if (!g_state.isInitialized || !g_state.player) {
+        LeaveCriticalSection(&g_state.lock);
+        return MP_E_NOT_INITIALIZED;
+    }
+
+    // Si déjà initialisé, retourner
+    if (g_state.audioMeter) {
+        LeaveCriticalSection(&g_state.lock);
+        return S_OK;
+    }
+
+    IMMDeviceEnumerator* pDeviceEnumerator = nullptr;
+    IMMDevice* pDevice = nullptr;
+    IAudioSessionManager2* pSessionManager = nullptr;
+    IAudioMeterInformation* pMeter = nullptr;
+
+    // Créer l'énumérateur
+    hr = CoCreateInstance(
+        __uuidof(MMDeviceEnumerator),
+        nullptr,
+        CLSCTX_ALL,
+        IID_PPV_ARGS(&pDeviceEnumerator)
+    );
+    if (FAILED(hr)) {
+        LogDebugW(L"Failed to create device enumerator: 0x%08x\n", hr);
+        goto cleanup;
+    }
+
+    // Obtenir le périphérique de rendu par défaut
+    hr = pDeviceEnumerator->GetDefaultAudioEndpoint(
+        eRender,
+        eMultimedia,  // Changé de eConsole à eMultimedia
+        &pDevice
+    );
+    if (FAILED(hr)) {
+        LogDebugW(L"Failed to get default audio endpoint: 0x%08x\n", hr);
+        goto cleanup;
+    }
+
+    // Obtenir le IAudioMeterInformation directement du périphérique
+    hr = pDevice->Activate(
+        __uuidof(IAudioMeterInformation),
+        CLSCTX_ALL,
+        nullptr,
+        reinterpret_cast<void**>(&pMeter)
+    );
+    if (FAILED(hr)) {
+        LogDebugW(L"Failed to activate IAudioMeterInformation: 0x%08x\n", hr);
+        goto cleanup;
+    }
+
+    // Stocker l'interface dans l'état global
+    g_state.audioMeter = pMeter;
+    pMeter = nullptr; // Transfert de propriété
+
+    LogDebugW(L"Audio metering initialized successfully\n");
+
+    cleanup:
+        SafeRelease(&pMeter);
+    SafeRelease(&pSessionManager);
+    SafeRelease(&pDevice);
+    SafeRelease(&pDeviceEnumerator);
+
+    LeaveCriticalSection(&g_state.lock);
+    return hr;
+}
+
+HRESULT GetChannelLevels(float* pLeft, float* pRight)
+{
+    if (!pLeft || !pRight) {
+        return E_INVALIDARG;
+    }
+
+    // Initialiser les valeurs par défaut
+    *pLeft = 0.0f;
+    *pRight = 0.0f;
+
+    HRESULT hr = InitializeAudioMetering();
+    if (FAILED(hr)) {
+        LogDebugW(L"Failed to initialize audio metering: 0x%08x\n", hr);
+        return hr;
+    }
+
+    EnterCriticalSection(&g_state.lock);
+
+    if (!g_state.audioMeter) {
+        LogDebugW(L"AudioMeter is null\n");
+        LeaveCriticalSection(&g_state.lock);
+        return E_FAIL;
+    }
+
+    UINT32 channelCount = 0;
+    hr = g_state.audioMeter->GetMeteringChannelCount(&channelCount);
+    if (FAILED(hr)) {
+        LogDebugW(L"GetMeteringChannelCount failed: 0x%08x\n", hr);
+        LeaveCriticalSection(&g_state.lock);
+        return hr;
+    }
+
+    LogDebugW(L"Channel count: %d\n", channelCount);
+
+    std::vector<float> peaks(channelCount, 0.0f);
+    hr = g_state.audioMeter->GetChannelsPeakValues(channelCount, peaks.data());
+    if (FAILED(hr)) {
+        LogDebugW(L"GetChannelsPeakValues failed: 0x%08x\n", hr);
+        LeaveCriticalSection(&g_state.lock);
+        return hr;
+    }
+
+    if (channelCount >= 2) {
+        *pLeft = peaks[0];
+        *pRight = peaks[1];
+        LogDebugW(L"Peak values - Left: %.3f, Right: %.3f\n", *pLeft, *pRight);
+    }
+    else if (channelCount == 1) {
+        *pLeft = *pRight = peaks[0];
+        LogDebugW(L"Mono peak value: %.3f\n", *pLeft);
+    }
+
+    LeaveCriticalSection(&g_state.lock);
+    return S_OK;
 }
 
 // =============== Player State ======================
@@ -745,6 +879,10 @@ void CleanupMediaPlayer()
     if (g_state.audioSession) {
         g_state.audioSession->Release();
         g_state.audioSession = nullptr;
+    }
+    if (g_state.audioMeter) {
+        g_state.audioMeter->Release();
+        g_state.audioMeter = nullptr;
     }
     LeaveCriticalSection(&g_state.lock);
 }

@@ -67,9 +67,14 @@ interface MediaPlayerLib : StdCallLibrary {
     fun GetVolume(pLevel: FloatByReference): Int
     fun SetMute(bMute: Boolean): Int
     fun GetMute(pbMute: BOOLByReference): Int
+    fun GetChannelLevels(
+        pLeft: FloatByReference,
+        pRight: FloatByReference
+    ): Int
 
     // Position and duration control
     fun GetDuration(pDuration: LongByReference): Int
     fun GetCurrentPosition(pPosition: LongByReference): Int
     fun SetPosition(position: Long): Int
+
 }
