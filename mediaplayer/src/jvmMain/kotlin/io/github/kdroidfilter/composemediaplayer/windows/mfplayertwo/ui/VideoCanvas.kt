@@ -26,6 +26,5 @@ class VideoCanvas : Canvas() {
 
     override fun paint(g: Graphics) {
         super.paint(g)
-        // Si vous avez besoin de redessiner quelque chose lors du paint, vous pouvez le faire ici
     }
 }
