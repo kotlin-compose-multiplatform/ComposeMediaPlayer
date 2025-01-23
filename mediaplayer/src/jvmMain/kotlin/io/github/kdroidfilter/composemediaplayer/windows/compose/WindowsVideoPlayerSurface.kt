@@ -1,11 +1,11 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose
+package io.github.kdroidfilter.composemediaplayer.windows.compose
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui.VideoCanvas
+import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
 import javax.swing.SwingUtilities
 
 @Composable

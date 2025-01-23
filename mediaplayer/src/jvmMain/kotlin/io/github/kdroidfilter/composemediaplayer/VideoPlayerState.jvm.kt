@@ -4,7 +4,7 @@ import androidx.compose.runtime.Stable
 import com.sun.jna.Platform
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose.WindowsVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
 
 
 /**

@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo
+package io.github.kdroidfilter.composemediaplayer.windows
 
 import com.sun.jna.Callback
 import com.sun.jna.Native

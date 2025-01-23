@@ -6,8 +6,8 @@ import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerSurface
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose.WindowsVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose.WindowsVideoPlayerSurface
+import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerSurface
 
 /**
  * Composable function for rendering a video player surface.

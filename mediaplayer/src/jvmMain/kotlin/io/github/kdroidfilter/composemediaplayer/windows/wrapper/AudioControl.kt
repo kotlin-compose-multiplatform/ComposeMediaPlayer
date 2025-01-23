@@ -1,8 +1,8 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper
+package io.github.kdroidfilter.composemediaplayer.windows.wrapper
 
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.ptr.FloatByReference
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
+import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 
 /**
  * Wrapper class for audio control functions

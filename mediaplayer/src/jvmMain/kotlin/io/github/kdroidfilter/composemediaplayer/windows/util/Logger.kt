@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util
+package io.github.kdroidfilter.composemediaplayer.windows.util
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

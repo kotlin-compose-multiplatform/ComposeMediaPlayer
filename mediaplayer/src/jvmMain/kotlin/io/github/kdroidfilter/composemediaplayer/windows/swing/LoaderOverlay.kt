@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui
+package io.github.kdroidfilter.composemediaplayer.windows.swing
 
 import java.awt.*
 import javax.swing.JPanel

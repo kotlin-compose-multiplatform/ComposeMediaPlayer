@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.compose
+package io.github.kdroidfilter.composemediaplayer.windows.compose
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,11 +9,11 @@ import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui.VideoCanvas
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
+import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
+import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
+import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
+import io.github.kdroidfilter.composemediaplayer.windows.wrapper.AudioControl
+import io.github.kdroidfilter.composemediaplayer.windows.wrapper.MediaPlayerSlider
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow

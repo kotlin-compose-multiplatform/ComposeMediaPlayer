@@ -1,12 +1,13 @@
-package io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui
+package io.github.kdroidfilter.composemediaplayer.windows.swing
 
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
-import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
+import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
+import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
+import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
+import io.github.kdroidfilter.composemediaplayer.windows.wrapper.AudioControl
+import io.github.kdroidfilter.composemediaplayer.windows.wrapper.MediaPlayerSlider
 import java.awt.*
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
