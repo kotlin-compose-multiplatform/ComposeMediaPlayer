@@ -10,6 +10,7 @@ import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.MediaPlayerLib
+import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.ui.VideoCanvas
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.util.Logger
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.AudioControl
 import io.github.kdroidfilter.composemediaplayer.windows.mfplayertwo.wrapper.MediaPlayerSlider
@@ -48,16 +49,10 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var isInitialized by mutableStateOf(false)
         private set
 
-    private var _isPlaying by mutableStateOf(mediaPlayer.IsPlaying())
+    private var _isPlaying by mutableStateOf(false)
     override val isPlaying: Boolean
-        get() {
-            if (!isInitialized || isLoading) return false
-            // Vérifie si on a atteint la fin de la vidéo
-            if (_duration > 0 && _currentTime >= _duration && !_loop) {
-                return false
-            }
-            return mediaPlayer.IsPlaying()
-        }
+        get() = _isPlaying
+
 
     private var _volume by mutableStateOf(1f)
     override var volume: Float
@@ -117,7 +112,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         private set
 
     // Initialize the player with a Canvas
-    fun initializeWithCanvas(canvas: Canvas) = coroutineScope.launch {
+    fun initializeWithCanvas(canvas: VideoCanvas) = coroutineScope.launch {
         if (isInitialized) return@launch
 
         try {
@@ -138,6 +133,12 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 }
 
                 videoCanvas = canvas
+
+                (videoCanvas as VideoCanvas).onResize = {
+                    mediaPlayer.UpdateVideo()
+                    logger.log("UpdateVideo() called on resize")
+                }
+
                 isInitialized = true
                 startVideoUpdates()
                 startAudioLevelsUpdate()
@@ -229,7 +230,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
             }
                 .onEach {
                     if (isInitialized) {
-                        mediaPlayer.UpdateVideo() // Redraw video frame
                         if (!_userDragging) {
                             updateProgressFromPlayer()
                         }
@@ -242,6 +242,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private fun updateProgressFromPlayer() {
         if (!mediaPlayer.IsInitialized()) return
         try {
+            _isPlaying = if (!isInitialized || isLoading) false
+            else if (_duration > 0 && _currentTime >= _duration && !_loop) false
+            else mediaPlayer.IsPlaying()
             mediaSlider.getDurationInSeconds()?.let { dur ->
                 if (dur > 0.0) {
                     _duration = dur

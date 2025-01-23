@@ -8,21 +8,24 @@ import java.awt.event.ComponentEvent
 
 /**
  * Canvas dedicated to video display.
- * Here, UpdateVideo() is no longer called systematically in paint().
+ * UpdateVideo() is called only when the Canvas is resized.
  */
 class VideoCanvas : Canvas() {
     private val logger = Logger("VideoCanvas")
+    var onResize: (() -> Unit)? = null  // Callback to handle resize events
 
     init {
         isVisible = true
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
                 logger.log("Canvas resized to: ${width}x${height}")
+                onResize?.invoke()
             }
         })
     }
 
     override fun paint(g: Graphics) {
         super.paint(g)
+        // Si vous avez besoin de redessiner quelque chose lors du paint, vous pouvez le faire ici
     }
 }
