@@ -68,7 +68,7 @@ kotlin {
             implementation(compose.material3)
             implementation(project(":mediaplayer"))
             implementation(compose.materialIconsExtended)
-            implementation(libs.filekit.compose)
+            implementation(libs.filekit.dialog.compose)
         }
 
         androidMain.dependencies {
