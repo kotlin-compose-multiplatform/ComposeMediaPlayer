@@ -18,6 +18,9 @@ actual open class VideoPlayerState {
     actual val isLoading = false
     actual  val error: VideoPlayerError? = null
 
+    private var _metadata = VideoMetadata()
+    actual val metadata: VideoMetadata get() = _metadata
+
     actual fun openUri(uri: String) {
     }
 

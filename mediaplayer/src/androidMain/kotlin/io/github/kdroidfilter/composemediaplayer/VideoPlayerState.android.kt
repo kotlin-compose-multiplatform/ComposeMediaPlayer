@@ -40,6 +40,9 @@ actual open class VideoPlayerState {
     private var _error by mutableStateOf<VideoPlayerError?>(null)
     actual val error: VideoPlayerError? get() = _error
 
+    private var _metadata = VideoMetadata()
+    actual val metadata: VideoMetadata get() = _metadata
+
     // Volume control
     private var _volume by mutableStateOf(1f)
     actual var volume: Float

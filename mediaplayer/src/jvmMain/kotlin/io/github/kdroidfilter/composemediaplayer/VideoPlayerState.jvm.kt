@@ -67,6 +67,10 @@ actual open class VideoPlayerState {
         set(value) {
             delegate.loop = value
         }
+
+    actual open val metadata: VideoMetadata get() = delegate.metadata
+
+
     actual open val leftLevel: Float get() = delegate.leftLevel
     actual open val rightLevel: Float get() = delegate.rightLevel
     actual open val positionText: String get() = delegate.positionText

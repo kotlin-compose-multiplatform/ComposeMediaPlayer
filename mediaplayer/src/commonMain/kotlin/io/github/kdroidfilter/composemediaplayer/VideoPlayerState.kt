@@ -28,7 +28,10 @@ expect open class VideoPlayerState() {
     val positionText: String
     val durationText: String
     val isLoading: Boolean
+
     val error: VideoPlayerError?
+
+    val metadata: VideoMetadata
 
     fun openUri(uri: String)
     fun play()

@@ -39,6 +39,8 @@ interface PlatformVideoPlayerState {
     val isLoading: Boolean
     val error: VideoPlayerError?
 
+    val metadata: VideoMetadata
+
     fun openUri(uri: String)
     fun play()
     fun pause()

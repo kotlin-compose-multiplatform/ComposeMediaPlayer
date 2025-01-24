@@ -8,6 +8,7 @@ import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
@@ -107,6 +108,8 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private var _error: VideoPlayerError? by mutableStateOf(null)
     override val error: VideoPlayerError?
         get() = _error
+
+    override val metadata: VideoMetadata = VideoMetadata()
 
     var errorMessage by mutableStateOf<String?>(null)
         private set

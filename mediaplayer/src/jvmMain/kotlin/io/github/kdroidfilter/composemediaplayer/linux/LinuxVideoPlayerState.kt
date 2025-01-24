@@ -5,12 +5,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import org.freedesktop.gstreamer.Bus
 import org.freedesktop.gstreamer.ElementFactory
 import org.freedesktop.gstreamer.Format
 import org.freedesktop.gstreamer.Gst
 import org.freedesktop.gstreamer.GstObject
+import org.freedesktop.gstreamer.TagList
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
 import org.freedesktop.gstreamer.swing.GstVideoComponent
@@ -93,6 +95,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private var _error by mutableStateOf<VideoPlayerError?>(null)
     override val error: VideoPlayerError?
         get() = _error
+    override val metadata: VideoMetadata = VideoMetadata()
+
     // endregion
 
     init {
@@ -110,7 +114,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                     } else {
                         stop()
                     }
-                    _isPlaying = loop // Met à jour l'état en fonction du mode boucle
+                    _isPlaying = loop // Updates the state based on loop mode
                 }
             }
         })
@@ -151,6 +155,21 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
         })
+
+        // Handle TAG messages for metadata
+        playbin.bus.connect(object : Bus.TAG {
+
+            override fun tagsFound(
+                source: GstObject?,
+                tagList: TagList?,
+            ) {
+                EventQueue.invokeLater {
+                    //TODO Implement metadata extraction
+                }
+            }
+        })
+
+
 
         // Audio level monitoring
         playbin.bus.connect("element") { _, message ->
@@ -221,19 +240,21 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+
+
     override fun openUri(uri: String) {
-        stop() // Ceci mettra aussi _isPlaying à false
+        stop() // This will also set _isPlaying to false
         clearError()
         _isLoading = true
 
         try {
-            val uri = if (uri.startsWith("http://") || uri.startsWith("https://")) {
+            val uriObj = if (uri.startsWith("http://") || uri.startsWith("https://")) {
                 URI(uri)
             } else {
                 File(uri).toURI()
             }
-            playbin.setURI(uri)
-            play() // Ceci mettra _isPlaying à true si succès
+            playbin.setURI(uriObj)
+            play() // This will set _isPlaying to true if successful
         } catch (e: Exception) {
             _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
             _isLoading = false
@@ -252,7 +273,6 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             _isPlaying = false
         }
     }
-
 
     override fun pause() {
         try {

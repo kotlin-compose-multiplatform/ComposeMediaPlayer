@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import javafx.application.Platform
 import javafx.scene.media.Media
@@ -62,6 +63,8 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override val durationText: String get() = formatTime(_duration)
     override val isLoading: Boolean get() = _isLoading
     override val error: VideoPlayerError? get() = _error
+    override val metadata: VideoMetadata = VideoMetadata()
+
 
     // Main function to update the MediaView
     fun updateMediaView(view: MediaView) {
