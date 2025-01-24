@@ -87,7 +87,6 @@ fun App() {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Bouton sélection fichier
                     FilledIconButton(
                         onClick = { fileKitLauncher.launch() },
                         colors = IconButtonDefaults.filledIconButtonColors(
@@ -97,7 +96,6 @@ fun App() {
                         Icon(Icons.Default.UploadFile, "Pick a file")
                     }
 
-                    // Bouton Play/Pause
                     FilledIconButton(
                         onClick = {
                             if (playerState.isPlaying) playerState.pause()
@@ -114,7 +112,6 @@ fun App() {
                         )
                     }
 
-                    // Bouton Stop
                     FilledIconButton(
                         onClick = { playerState.stop() },
                         colors = IconButtonDefaults.filledIconButtonColors(
@@ -180,7 +177,6 @@ fun App() {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Contrôle du volume compact
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.width(200.dp)
@@ -218,7 +214,6 @@ fun App() {
                                 )
                             }
 
-                            // Contrôle de boucle
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(start = 8.dp)
@@ -236,7 +231,6 @@ fun App() {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Champ URL
                         OutlinedTextField(
                             value = url,
                             onValueChange = { url = it },
@@ -260,15 +254,17 @@ fun App() {
                 }
             }
 
-            // Gestion des erreurs avec animation
+            // Snackbar d'erreur repositionné
             playerState.error?.let { error ->
                 AnimatedVisibility(
                     visible = true,
-                    enter = fadeIn() + slideInVertically(),
-                    exit = fadeOut() + slideOutVertically()
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
                 ) {
                     Snackbar(
-                        modifier = Modifier.padding(16.dp),
                         action = {
                             TextButton(
                                 onClick = { playerState.clearError() },
