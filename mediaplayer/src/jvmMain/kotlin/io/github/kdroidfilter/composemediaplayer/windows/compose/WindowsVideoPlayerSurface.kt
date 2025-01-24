@@ -20,10 +20,9 @@ fun WindowsVideoPlayerSurface(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
+        val swingPanelModifier = if(!playerState.hasMedia) Modifier else Modifier.fillMaxHeight().aspectRatio(playerState.aspectRatio)
         SwingPanel(
-            modifier = Modifier
-                .fillMaxHeight()
-                .aspectRatio(playerState.aspectRatio),
+            modifier = swingPanelModifier,
             factory = {
                 VideoCanvas().apply {
                     SwingUtilities.invokeLater {
