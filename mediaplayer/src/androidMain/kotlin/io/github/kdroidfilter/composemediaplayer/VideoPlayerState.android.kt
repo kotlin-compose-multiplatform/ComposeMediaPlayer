@@ -216,7 +216,14 @@ actual open class VideoPlayerState {
     }
 
     actual fun play() {
-        exoPlayer?.play()
+        exoPlayer?.let { player ->
+            if (player.playbackState == Player.STATE_IDLE) {
+                // If the player is in IDLE state (after stop), prepare it again
+                player.prepare()
+            }
+            player.play()
+        }
+        _hasMedia = true
     }
 
     actual fun pause() {
@@ -224,8 +231,12 @@ actual open class VideoPlayerState {
     }
 
     actual fun stop() {
-        exoPlayer?.stop()
-        resetStates()
+        exoPlayer?.let { player ->
+            player.stop()
+            player.seekTo(0) // Ensure position is reset to beginning
+        }
+        _hasMedia = false
+        resetStates(keepMedia = true)
     }
 
     actual fun seekTo(value: Float) {
@@ -239,7 +250,7 @@ actual open class VideoPlayerState {
         _error = null
     }
 
-    private fun resetStates() {
+    private fun resetStates(keepMedia: Boolean = false) {
         _currentTime = 0.0
         _duration = 0.0
         _sliderPos = 0f
@@ -248,7 +259,9 @@ actual open class VideoPlayerState {
         _isPlaying = false
         _isLoading = false
         _error = null
-        _hasMedia = false  // Reset hasMedia state
+        if (!keepMedia) {
+            _hasMedia = false
+        }
     }
 
     actual fun dispose() {
