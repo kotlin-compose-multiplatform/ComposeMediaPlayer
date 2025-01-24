@@ -48,7 +48,7 @@ fun App() {
             ) {
                 // En-tête
                 Text(
-                    "KDroid Video Player",
+                    "Compose Media Player",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,

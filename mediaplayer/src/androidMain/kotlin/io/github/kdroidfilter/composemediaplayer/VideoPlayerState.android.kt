@@ -31,7 +31,7 @@ actual open class VideoPlayerState {
     private val audioProcessor = AudioLevelProcessor()
 
     private var _hasMedia by mutableStateOf(false)
-    val hasMedia: Boolean get() = _hasMedia
+    actual val hasMedia: Boolean get() = _hasMedia
 
     // State properties
     private var _isPlaying by mutableStateOf(false)

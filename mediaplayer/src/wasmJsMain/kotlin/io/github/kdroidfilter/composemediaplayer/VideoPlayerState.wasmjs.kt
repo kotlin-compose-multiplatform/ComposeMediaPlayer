@@ -5,7 +5,7 @@ import androidx.compose.runtime.Stable
 @Stable
 actual open class VideoPlayerState {
     //TODO
-
+    actual val hasMedia: Boolean = false
     actual val isPlaying: Boolean = false
     actual var volume: Float = 1.0f
     actual var sliderPos: Float = 0.0f

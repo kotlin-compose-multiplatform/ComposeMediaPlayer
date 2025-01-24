@@ -54,6 +54,8 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
             _loop = value
             updateLoopStatus()
         }
+    override val hasMedia: Boolean
+        get() = TODO("Not yet implemented")
 
     // Public getters
     override val isPlaying: Boolean get() = _isPlaying

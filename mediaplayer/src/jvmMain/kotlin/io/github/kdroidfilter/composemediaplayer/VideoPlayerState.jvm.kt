@@ -44,6 +44,7 @@ actual open class VideoPlayerState {
         else -> throw UnsupportedOperationException("Unsupported platform")
     }
 
+    actual open val hasMedia: Boolean get() = delegate.hasMedia
     actual open val isPlaying: Boolean get() = delegate.isPlaying
     actual open val isLoading: Boolean get() = delegate.isLoading
     actual open val error: VideoPlayerError? get() = delegate.error

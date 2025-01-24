@@ -54,6 +54,9 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var isInitialized by mutableStateOf(false)
         private set
 
+    override val hasMedia: Boolean
+        get() = TODO("Not yet implemented")
+
     private var _isPlaying by mutableStateOf(false)
     override val isPlaying: Boolean
         get() = _isPlaying

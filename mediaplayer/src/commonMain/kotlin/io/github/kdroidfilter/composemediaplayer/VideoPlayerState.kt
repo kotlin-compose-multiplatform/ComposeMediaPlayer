@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
  */
 @Stable
 expect open class VideoPlayerState() {
+    val hasMedia : Boolean
     val isPlaying: Boolean
     var volume: Float
     var sliderPos: Float

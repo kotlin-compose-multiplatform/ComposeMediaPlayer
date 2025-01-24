@@ -27,6 +27,7 @@ package io.github.kdroidfilter.composemediaplayer
  * - `dispose()`: Releases resources and performs cleanup for the video player instance.
  */
 interface PlatformVideoPlayerState {
+    val hasMedia : Boolean
     val isPlaying: Boolean
     var volume: Float
     var sliderPos: Float

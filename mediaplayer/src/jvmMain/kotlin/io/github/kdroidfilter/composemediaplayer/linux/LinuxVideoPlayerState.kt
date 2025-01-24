@@ -97,7 +97,11 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val isLoading: Boolean
         get() = _isLoading
 
+    override val hasMedia: Boolean
+        get() = TODO("Not yet implemented")
+
     private var _isPlaying by mutableStateOf(false)
+
     override val isPlaying: Boolean
         get() = _isPlaying
 
