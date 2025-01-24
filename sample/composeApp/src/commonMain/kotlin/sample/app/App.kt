@@ -253,6 +253,14 @@ fun App() {
                             shape = RoundedCornerShape(8.dp)
                         )
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("L: ${playerState.leftLevel.toInt()}%")
+                        Text("R: ${playerState.rightLevel.toInt()}%")
+                    }
                 }
             }
 
