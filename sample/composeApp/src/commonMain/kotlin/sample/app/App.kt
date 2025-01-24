@@ -1,17 +1,18 @@
 package sample.app
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
@@ -21,51 +22,265 @@ import io.github.vinceglb.filekit.core.PickerType
 
 @Composable
 fun App() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(Color.White),
-        contentAlignment = Alignment.Center
-    ) {
+    MaterialTheme {
         var url by remember {
             mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
         }
+        val playerState = rememberVideoPlayerState()
 
-        MaterialTheme {
-            val playerState = rememberVideoPlayerState()
+        val fileKitLauncher = rememberFilePickerLauncher(
+            type = PickerType.Video,
+            title = "Select a Video File",
+            onResult = { file ->
+                file?.path?.let { playerState.openUri(it) }
+            }
+        )
 
-            val fileKitLauncher = rememberFilePickerLauncher(
-                type = PickerType.Video,
-                title = "Select a Video File",
-                onResult = { file ->
-                    file?.path?.let { playerState.openUri(it) }
-                    print(file?.path)
-                }
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // En-tête
+                Text(
+                    "KDroid Video Player",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-            Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-
-                // Video zone
+                // Zone vidéo
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     if (playerState.isLoading) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     } else {
                         VideoPlayerSurface(
                             playerState = playerState,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(16.dp)),
                         )
                     }
                 }
 
-                // Error handling
-                playerState.error?.let { error ->
-                    Snackbar(
-                        action = {
-                            Button(onClick = { playerState.clearError() }) {
-                                Text("Clear")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Contrôles principaux
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Bouton sélection fichier
+                    FilledIconButton(
+                        onClick = { fileKitLauncher.launch() },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Icon(Icons.Default.UploadFile, "Pick a file")
+                    }
+
+                    // Bouton Play/Pause
+                    FilledIconButton(
+                        onClick = {
+                            if (playerState.isPlaying) playerState.pause()
+                            else playerState.play()
+                        },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (playerState.isPlaying) Icons.Default.Pause
+                            else Icons.Default.PlayArrow,
+                            contentDescription = if (playerState.isPlaying) "Pause" else "Play"
+                        )
+                    }
+
+                    // Bouton Stop
+                    FilledIconButton(
+                        onClick = { playerState.stop() },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Icon(Icons.Default.Stop, "Stop")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Timeline
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Slider(
+                        value = playerState.sliderPos,
+                        onValueChange = {
+                            playerState.sliderPos = it
+                            playerState.userDragging = true
+                        },
+                        onValueChangeFinished = {
+                            playerState.userDragging = false
+                            playerState.seekTo(playerState.sliderPos)
+                        },
+                        valueRange = 0f..1000f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            playerState.positionText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            playerState.durationText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Carte des contrôles secondaires
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Contrôle du volume compact
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.width(200.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        if (playerState.volume > 0f) {
+                                            playerState.volume = 0f
+                                        } else {
+                                            playerState.volume = 1f
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = if (playerState.volume > 0f)
+                                            Icons.Default.VolumeUp
+                                        else
+                                            Icons.Default.VolumeOff,
+                                        contentDescription = "Volume",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                Slider(
+                                    value = playerState.volume,
+                                    onValueChange = { playerState.volume = it },
+                                    valueRange = 0f..1f,
+                                    modifier = Modifier.width(100.dp)
+                                )
+
+                                Text(
+                                    "${(playerState.volume * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.width(40.dp)
+                                )
+                            }
+
+                            // Contrôle de boucle
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    "Loop",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Switch(
+                                    checked = playerState.loop,
+                                    onCheckedChange = { playerState.loop = it }
+                                )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Champ URL
+                        OutlinedTextField(
+                            value = url,
+                            onValueChange = { url = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Video URL") },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        if (url.isNotEmpty()) {
+                                            playerState.openUri(url)
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.PlayCircle, "Open URL")
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+            }
+
+            // Gestion des erreurs avec animation
+            playerState.error?.let { error ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn() + slideInVertically(),
+                    exit = fadeOut() + slideOutVertically()
+                ) {
+                    Snackbar(
+                        modifier = Modifier.padding(16.dp),
+                        action = {
+                            TextButton(
+                                onClick = { playerState.clearError() },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.inversePrimary
+                                )
+                            ) {
+                                Text("Dismiss")
+                            }
+                        },
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ) {
                         Text(
                             when (error) {
@@ -73,112 +288,12 @@ fun App() {
                                 is VideoPlayerError.NetworkError -> "Network Error: ${error.message}"
                                 is VideoPlayerError.SourceError -> "Source Error: ${error.message}"
                                 is VideoPlayerError.UnknownError -> "Unknown Error: ${error.message}"
-                            }
+                            },
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Controls
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    IconButton(onClick = { fileKitLauncher.launch() }) {
-                        Icon(
-                            imageVector = Icons.Default.UploadFile,
-                            contentDescription = "Pick a local file"
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            if (playerState.isPlaying) playerState.pause()
-                            else playerState.play()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (playerState.isPlaying)
-                                Icons.Default.Pause
-                            else
-                                Icons.Default.PlayArrow,
-                            contentDescription = if (playerState.isPlaying) "Pause" else "Play"
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            playerState.stop()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Stop, "Stop"
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Loop?")
-                        Switch(
-                            checked = playerState.loop,
-                            onCheckedChange = { playerState.loop = it }
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Volume: ${(playerState.volume * 100).toInt()}%")
-                        Slider(
-                            value = playerState.volume,
-                            onValueChange = { playerState.volume = it },
-                            valueRange = 0f..1f,
-                            modifier = Modifier.width(120.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // URL input
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextField(
-                        value = url,
-                        onValueChange = { url = it },
-                        modifier = Modifier.weight(0.8f),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (url.isNotEmpty()) {
-                                playerState.openUri(url)
-                            }
-                        },
-                        modifier = Modifier.weight(0.2f)
-                    ) {
-                        Text("Open URL")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Timeline
-                Text("Position:")
-                Slider(
-                    value = playerState.sliderPos,
-                    onValueChange = {
-                        playerState.sliderPos = it
-                        playerState.userDragging = true
-                    },
-                    onValueChangeFinished = {
-                        playerState.userDragging = false
-                        playerState.seekTo(playerState.sliderPos)
-                    },
-                    valueRange = 0f..1000f
-                )
-
-                Text("Time: ${playerState.positionText} / ${playerState.durationText}")
-                Text("L: ${playerState.leftLevel.toInt()}%  R: ${playerState.rightLevel.toInt()}%")
             }
         }
     }
