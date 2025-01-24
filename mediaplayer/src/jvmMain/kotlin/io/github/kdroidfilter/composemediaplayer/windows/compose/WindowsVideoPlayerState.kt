@@ -54,8 +54,10 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var isInitialized by mutableStateOf(false)
         private set
 
+
+    private var _hasMedia by mutableStateOf(false)
     override val hasMedia: Boolean
-        get() = TODO("Not yet implemented")
+        get() = _hasMedia
 
     private var _isPlaying by mutableStateOf(false)
     override val isPlaying: Boolean
@@ -174,6 +176,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override fun openUri(uri: String) {
         if (!isInitialized) {
             handleError("Player not initialized")
+            _hasMedia = false
             return
         }
         resetState()
@@ -197,9 +200,11 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 handleError("Unable to open (HR=0x${hr.toString(16)})")
                 return
             }
+            _hasMedia = true
             startLoadingTimeout()
 
         } catch (e: Exception) {
+            _hasMedia = false
             handleError("openUri error: ${e.message}")
         }
     }
@@ -335,6 +340,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _currentTime = 0.0
         _duration = 0.0
         _progress = 0f
+        _hasMedia = false
     }
 
     private fun startLoadingTimeout() {
@@ -353,6 +359,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         _currentTime = 0.0
         _duration = 0.0
         _progress = 0f
+        _hasMedia = false
         videoCanvas = null
         logger.log("Player cleaned up.")
     }
