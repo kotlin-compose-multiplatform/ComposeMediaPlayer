@@ -97,8 +97,10 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val isLoading: Boolean
         get() = _isLoading
 
+    private var _hasMedia by mutableStateOf(false)
+
     override val hasMedia: Boolean
-        get() = TODO("Not yet implemented")
+        get() = _hasMedia
 
     private var _isPlaying by mutableStateOf(false)
 
@@ -321,6 +323,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         stop() // This will also set _isPlaying to false
         clearError()
         _isLoading = true
+        _hasMedia = false
 
         try {
             val uriObj = if (uri.startsWith("http://") || uri.startsWith("https://")) {
@@ -329,11 +332,13 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 File(uri).toURI()
             }
             playbin.setURI(uriObj)
+            _hasMedia = true
             play() // This will set _isPlaying to true if successful
         } catch (e: Exception) {
             _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
             _isLoading = false
             _isPlaying = false
+            _hasMedia = false
             e.printStackTrace()
         }
     }
@@ -370,6 +375,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         _isLoading = false
         isUserPaused = false
         bufferingPercent = 100
+        _hasMedia = false
     }
 
     override fun seekTo(value: Float) {

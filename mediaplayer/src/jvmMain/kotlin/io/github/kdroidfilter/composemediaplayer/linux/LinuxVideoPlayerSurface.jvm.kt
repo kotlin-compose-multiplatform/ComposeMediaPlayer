@@ -30,11 +30,13 @@ fun LinuxVideoPlayerSurface(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        SwingPanel(
-            modifier = Modifier
-                .fillMaxHeight()
-                .aspectRatio(playerState.aspectRatio),
-            factory = { playerState.gstVideoComponent }
-        )
+        if (playerState.hasMedia) {
+            SwingPanel(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(playerState.aspectRatio),
+                factory = { playerState.gstVideoComponent }
+            )
+        }
     }
 }
