@@ -5,6 +5,7 @@ import com.sun.jna.Platform
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
+import io.github.vinceglb.filekit.PlatformFile
 
 
 /**
@@ -78,6 +79,7 @@ actual open class VideoPlayerState {
     actual open val durationText: String get() = delegate.durationText
 
     actual open fun openUri(uri: String) = delegate.openUri(uri)
+    actual open fun openFile(file: PlatformFile) = delegate.openUri(file.file.path)
     actual open fun play() = delegate.play()
     actual open fun pause() = delegate.pause()
     actual open fun stop() = delegate.stop()

@@ -2,7 +2,7 @@
 
 import com.vanniktech.maven.publish.SonatypeHost
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import java.util.*
+import java.util.Locale
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -45,6 +45,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.coroutines.test)
+            api(libs.filekit.core)
         }
 
         commonTest.dependencies {

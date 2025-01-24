@@ -13,6 +13,8 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.kdroid.androidcontextprovider.ContextProvider
+import io.github.vinceglb.filekit.AndroidFile
+import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -194,12 +196,24 @@ actual open class VideoPlayerState {
     }
 
     actual fun openUri(uri: String) {
+        val mediaItem = MediaItem.fromUri(uri)
+        openFromMediaItem(mediaItem)
+    }
+
+    actual fun openFile(file: PlatformFile) {
+        val mediaItem = when (val androidFile = file.androidFile) {
+            is AndroidFile.UriWrapper -> MediaItem.fromUri(androidFile.uri)
+            is AndroidFile.FileWrapper -> MediaItem.fromUri(androidFile.file.path)
+        }
+        openFromMediaItem(mediaItem)
+    }
+
+    private fun openFromMediaItem(mediaItem: MediaItem) {
         exoPlayer?.let { player ->
             player.stop()
             player.clearMediaItems()
             try {
                 _error = null
-                val mediaItem = MediaItem.fromUri(uri)
                 player.setMediaItem(mediaItem)
                 player.prepare()
                 player.volume = volume
