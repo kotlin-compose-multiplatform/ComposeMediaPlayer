@@ -347,6 +347,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         try {
             playbin.play()
             playbin.set("volume", volume.toDouble())
+            _hasMedia = true
             _isPlaying = true
             isUserPaused = false
             updateLoadingState()
