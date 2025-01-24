@@ -1,6 +1,7 @@
 package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Stable
+import io.github.vinceglb.filekit.PlatformFile
 
 @Stable
 actual open class VideoPlayerState {
@@ -22,6 +23,9 @@ actual open class VideoPlayerState {
     actual val metadata: VideoMetadata get() = _metadata
 
     actual fun openUri(uri: String) {
+    }
+
+    actual fun openFile(file: PlatformFile) {
     }
 
     actual fun play() {
