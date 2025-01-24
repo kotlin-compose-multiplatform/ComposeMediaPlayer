@@ -8,13 +8,19 @@ import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import org.freedesktop.gstreamer.Bus
+import org.freedesktop.gstreamer.Element
 import org.freedesktop.gstreamer.ElementFactory
 import org.freedesktop.gstreamer.Format
 import org.freedesktop.gstreamer.Gst
 import org.freedesktop.gstreamer.GstObject
+import org.freedesktop.gstreamer.State.PAUSED
+import org.freedesktop.gstreamer.State.PLAYING
+import org.freedesktop.gstreamer.State.READY
 import org.freedesktop.gstreamer.TagList
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
+import org.freedesktop.gstreamer.message.Message
+import org.freedesktop.gstreamer.message.MessageType
 import org.freedesktop.gstreamer.swing.GstVideoComponent
 import java.awt.EventQueue
 import java.io.File
@@ -101,6 +107,11 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val metadata: VideoMetadata = VideoMetadata()
 
     // endregion
+    private var lastAspectRatioUpdateTime: Long = 0
+    private val ASPECT_RATIO_DEBOUNCE_MS = 500
+    private var _aspectRatio by mutableStateOf(16f/9f) // Ratio par défaut
+    val aspectRatio: Float
+        get() = _aspectRatio
 
     init {
         // GStreamer configuration
@@ -158,18 +169,20 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                                       pending: org.freedesktop.gstreamer.State) {
                 EventQueue.invokeLater {
                     when (current) {
-                        org.freedesktop.gstreamer.State.PLAYING -> {
+                        PLAYING -> {
                             _isPlaying = true
                             isUserPaused = false
                             updateLoadingState()
+                            updateAspectRatio()
                         }
-                        org.freedesktop.gstreamer.State.PAUSED -> {
+                        PAUSED -> {
                             _isPlaying = false
                             updateLoadingState()
                         }
-                        org.freedesktop.gstreamer.State.READY -> {
+                        READY -> {
                             _isPlaying = false
                             updateLoadingState()
+
                         }
                         else -> {
                             _isPlaying = false
@@ -243,6 +256,40 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         }
         sliderTimer.start()
+    }
+
+    private fun updateAspectRatio() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastAspectRatioUpdateTime < ASPECT_RATIO_DEBOUNCE_MS) {
+            return // Skip update if called too soon
+        }
+        lastAspectRatioUpdateTime = currentTime
+
+        try {
+            val videoSink = playbin.get("video-sink") as? Element
+            val sinkPad = videoSink?.getStaticPad("sink")
+            val caps = sinkPad?.currentCaps
+            val structure = caps?.getStructure(0)
+
+            if (structure != null) {
+                val width = structure.getInteger("width")
+                val height = structure.getInteger("height")
+
+                if (width > 0 && height > 0) {
+                    val calculatedRatio = width.toFloat() / height.toFloat()
+                    if (calculatedRatio != _aspectRatio) { // Only update if changed
+                        EventQueue.invokeLater {
+                            _aspectRatio = if (calculatedRatio > 0) calculatedRatio else 16f / 9f
+                            println("Aspect ratio updated to: $_aspectRatio")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            println("Error updating aspect ratio: ${e.message}")
+            e.printStackTrace()
+            _aspectRatio = 16f / 9f
+        }
     }
 
     private fun updateLoadingState() {
