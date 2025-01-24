@@ -221,9 +221,13 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         } else {
             mediaOperation("resume playback") { mediaPlayer.ResumePlayback() }
         }
+        _hasMedia = true
     }
     override fun pause() = mediaOperation("pause") { mediaPlayer.PausePlayback() }
-    override fun stop() = mediaOperation("stop playback") { mediaPlayer.StopPlayback() }
+    override fun stop() {
+        mediaOperation("stop playback") { mediaPlayer.StopPlayback() }
+        _hasMedia = false
+    }
 
     override fun seekTo(value: Float) {
         sliderPos = value
