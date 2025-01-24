@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
+import io.github.vinceglb.filekit.PlatformFile
 
 /**
  * Represents the state and controls for a video player. This class provides properties
@@ -35,6 +36,7 @@ expect open class VideoPlayerState() {
     val metadata: VideoMetadata
 
     fun openUri(uri: String)
+    fun openFile(file: PlatformFile)
     fun play()
     fun pause()
     fun stop()
