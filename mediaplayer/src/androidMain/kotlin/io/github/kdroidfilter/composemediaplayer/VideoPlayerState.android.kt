@@ -30,6 +30,9 @@ actual open class VideoPlayerState {
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val audioProcessor = AudioLevelProcessor()
 
+    private var _hasMedia by mutableStateOf(false)
+    val hasMedia: Boolean get() = _hasMedia
+
     // State properties
     private var _isPlaying by mutableStateOf(false)
     actual val isPlaying: Boolean get() = _isPlaying
@@ -202,9 +205,11 @@ actual open class VideoPlayerState {
                 player.volume = volume
                 player.repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
                 player.play()
+                _hasMedia = true  // Set to true when media is loaded
             } catch (e: Exception) {
                 println("Error opening media: ${e.message}")
                 _isPlaying = false
+                _hasMedia = false  // Set to false on error
                 _error = VideoPlayerError.SourceError("Failed to load media: ${e.message}")
             }
         }
@@ -243,6 +248,7 @@ actual open class VideoPlayerState {
         _isPlaying = false
         _isLoading = false
         _error = null
+        _hasMedia = false  // Reset hasMedia state
     }
 
     actual fun dispose() {

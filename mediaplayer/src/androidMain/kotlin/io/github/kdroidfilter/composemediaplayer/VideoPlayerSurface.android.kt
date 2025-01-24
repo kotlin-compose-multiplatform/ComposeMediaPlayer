@@ -17,8 +17,14 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                     defaultArtwork = null
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    // Hide the surface when no media is loaded
+                    visibility = if (state.hasMedia) android.view.View.VISIBLE else android.view.View.GONE
                 }
             }
+        },
+        update = { view ->
+            // Update visibility when hasMedia changes
+            view.visibility = if (playerState.hasMedia) android.view.View.VISIBLE else android.view.View.GONE
         }
     )
 }
