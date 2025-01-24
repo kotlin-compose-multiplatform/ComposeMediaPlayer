@@ -118,6 +118,11 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    // In WindowsVideoPlayerState class
+    private var _aspectRatio by mutableStateOf(16f/9f) // Default 16:9
+    val aspectRatio: Float
+        get() = _aspectRatio
+
     // Initialize the player with a Canvas
     fun initializeWithCanvas(canvas: VideoCanvas) = coroutineScope.launch {
         if (isInitialized) return@launch
@@ -415,9 +420,14 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 logger.log("Media item set event received")
                 updateProgressFromPlayer()
                 videoMetrics.getAspectRatio()?.let { ratio ->
+                    _aspectRatio = ratio  // Update the aspect ratio
                     logger.log("Video aspect ratio: $ratio")
-                } ?: logger.error("Could not get video aspect ratio")
+                } ?: run {
+                    _aspectRatio = 16f/9f  // Fall back to 16:9 if we can't get the ratio
+                    logger.error("Could not get video aspect ratio")
+                }
             }
+
             MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> {
                 logger.log("Playback started event received")
                 handlePlaybackStarted()

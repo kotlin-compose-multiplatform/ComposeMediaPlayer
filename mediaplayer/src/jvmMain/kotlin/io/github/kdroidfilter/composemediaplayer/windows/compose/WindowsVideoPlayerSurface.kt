@@ -23,7 +23,7 @@ fun WindowsVideoPlayerSurface(
         SwingPanel(
             modifier = Modifier
                 .fillMaxHeight()
-                .aspectRatio(16f/9f), // Force 16:9 aspect ratio
+                .aspectRatio(playerState.aspectRatio),
             factory = {
                 VideoCanvas().apply {
                     SwingUtilities.invokeLater {
