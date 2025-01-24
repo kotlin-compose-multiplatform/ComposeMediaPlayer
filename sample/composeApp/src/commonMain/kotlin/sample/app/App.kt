@@ -17,8 +17,9 @@ import androidx.compose.ui.unit.dp
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
-import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
-import io.github.vinceglb.filekit.core.PickerType
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialog.PickerType
+import io.github.vinceglb.filekit.dialog.compose.rememberFilePickerLauncher
 
 @Composable
 fun App() {
@@ -32,7 +33,8 @@ fun App() {
             type = PickerType.Video,
             title = "Select a Video File",
             onResult = { file ->
-                file?.path?.let { playerState.openUri(it) }
+                file?.let { playerState.openFile(it) }
+                // Or: file?.let { playerState.openUri(it.getUri()) }
             }
         )
 
@@ -294,3 +296,5 @@ fun App() {
         }
     }
 }
+
+expect fun PlatformFile.getUri(): String
