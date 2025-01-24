@@ -43,6 +43,9 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private val sliderTimer = Timer(50, null)
 
     // region: State declarations
+    private var bufferingPercent by mutableStateOf(100)
+    private var isUserPaused by mutableStateOf(false)
+
     private var _sliderPos by mutableStateOf(0f)
     override var sliderPos: Float
         get() = _sliderPos
@@ -139,18 +142,39 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         })
 
+        playbin.bus.connect(object : Bus.BUFFERING {
+            override fun bufferingData(source: GstObject, percent: Int) {
+                EventQueue.invokeLater {
+                    bufferingPercent = percent
+                    updateLoadingState()
+                }
+            }
+        })
+
         playbin.bus.connect(object : Bus.STATE_CHANGED {
             override fun stateChanged(source: GstObject,
                                       old: org.freedesktop.gstreamer.State,
                                       current: org.freedesktop.gstreamer.State,
                                       pending: org.freedesktop.gstreamer.State) {
                 EventQueue.invokeLater {
-                    _isPlaying = current == org.freedesktop.gstreamer.State.PLAYING
-                    _isLoading = when (current) {
-                        org.freedesktop.gstreamer.State.READY,
-                        org.freedesktop.gstreamer.State.PAUSED -> true
-                        org.freedesktop.gstreamer.State.PLAYING -> false
-                        else -> _isLoading
+                    when (current) {
+                        org.freedesktop.gstreamer.State.PLAYING -> {
+                            _isPlaying = true
+                            isUserPaused = false
+                            updateLoadingState()
+                        }
+                        org.freedesktop.gstreamer.State.PAUSED -> {
+                            _isPlaying = false
+                            updateLoadingState()
+                        }
+                        org.freedesktop.gstreamer.State.READY -> {
+                            _isPlaying = false
+                            updateLoadingState()
+                        }
+                        else -> {
+                            _isPlaying = false
+                            updateLoadingState()
+                        }
                     }
                 }
             }
@@ -158,18 +182,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
         // Handle TAG messages for metadata
         playbin.bus.connect(object : Bus.TAG {
-
-            override fun tagsFound(
-                source: GstObject?,
-                tagList: TagList?,
-            ) {
+            override fun tagsFound(source: GstObject?, tagList: TagList?) {
                 EventQueue.invokeLater {
                     //TODO Implement metadata extraction
                 }
             }
         })
-
-
 
         // Audio level monitoring
         playbin.bus.connect("element") { _, message ->
@@ -227,6 +245,14 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         sliderTimer.start()
     }
 
+    private fun updateLoadingState() {
+        _isLoading = when {
+            bufferingPercent < 100 -> true  // Still buffering
+            isUserPaused -> false           // User paused, not loading
+            else -> false                   // Not buffering and not user paused
+        }
+    }
+
     private fun formatTimeNs(ns: Long): String {
         val totalSeconds = ns / 1_000_000_000L
         val seconds = totalSeconds % 60
@@ -239,8 +265,6 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             String.format("%d:%02d", minutes, seconds)
         }
     }
-
-
 
     override fun openUri(uri: String) {
         stop() // This will also set _isPlaying to false
@@ -268,6 +292,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             playbin.play()
             playbin.set("volume", volume.toDouble())
             _isPlaying = true
+            isUserPaused = false
+            updateLoadingState()
         } catch (e: Exception) {
             _error = VideoPlayerError.UnknownError("Failed to play: ${e.message}")
             _isPlaying = false
@@ -278,6 +304,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         try {
             playbin.pause()
             _isPlaying = false
+            isUserPaused = true
+            updateLoadingState()
         } catch (e: Exception) {
             _error = VideoPlayerError.UnknownError("Failed to pause: ${e.message}")
         }
@@ -289,6 +317,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         _sliderPos = 0f
         _positionText = "0:00"
         _isLoading = false
+        isUserPaused = false
+        bufferingPercent = 100
     }
 
     override fun seekTo(value: Float) {
