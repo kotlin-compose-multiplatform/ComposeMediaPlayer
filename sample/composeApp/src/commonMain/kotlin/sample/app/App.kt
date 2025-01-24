@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -194,9 +196,9 @@ fun App() {
                                 ) {
                                     Icon(
                                         imageVector = if (playerState.volume > 0f)
-                                            Icons.Default.VolumeUp
+                                            Icons.AutoMirrored.Filled.VolumeUp
                                         else
-                                            Icons.Default.VolumeOff,
+                                            Icons.AutoMirrored.Filled.VolumeOff,
                                         contentDescription = "Volume",
                                         tint = MaterialTheme.colorScheme.primary
                                     )
