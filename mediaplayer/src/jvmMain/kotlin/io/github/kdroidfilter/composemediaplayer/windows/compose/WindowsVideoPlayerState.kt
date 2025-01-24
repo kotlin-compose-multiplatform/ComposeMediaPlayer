@@ -15,6 +15,7 @@ import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
 import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
 import io.github.kdroidfilter.composemediaplayer.windows.wrapper.AudioControl
 import io.github.kdroidfilter.composemediaplayer.windows.wrapper.MediaPlayerSlider
+import io.github.kdroidfilter.composemediaplayer.windows.wrapper.VideoMetrics
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
@@ -26,6 +27,7 @@ import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class WindowsVideoPlayerState : PlatformVideoPlayerState {
+    private lateinit var mediaPlayerCallback: MediaPlayerLib.MediaPlayerCallback
 
     companion object {
         private const val UPDATE_INTERVAL = 60L  // ~60 FPS
@@ -37,6 +39,8 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private val mediaPlayer = MediaPlayerLib.INSTANCE
     private val audioControl = AudioControl(mediaPlayer)
     private val mediaSlider = MediaPlayerSlider(mediaPlayer)
+    private val videoMetrics = VideoMetrics(mediaPlayer)
+
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Rendering canvas
@@ -128,8 +132,15 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                 if (!canvas.isDisplayable) {
                     canvas.createBufferStrategy(1)
                 }
-                val callback = MediaPlayerLib.MediaPlayerCallback(::onMediaEvent)
-                val hr = mediaPlayer.InitializeMediaPlayer(WinDef.HWND(hwnd), callback)
+
+                mediaPlayerCallback = MediaPlayerLib.MediaPlayerCallback { eventType, hr ->
+                    onMediaEvent(eventType, hr)
+                }
+
+                logger.log("Registering callback...")
+                val hr = mediaPlayer.InitializeMediaPlayer(WinDef.HWND(hwnd), mediaPlayerCallback)
+                logger.log("InitializeMediaPlayer returned HR=0x${hr.toString(16)}")
+
                 if (hr < 0) {
                     handleError("MediaPlayer initialization failed (HR=0x${hr.toString(16)})")
                     return@withContext
@@ -160,14 +171,20 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         resetState()
 
         try {
+            logger.log("Opening URI: $uri") // Ajout de log
             val hr = when {
-                uri.startsWith("http", ignoreCase = true) -> mediaPlayer.PlayURL(WString(uri))
+                uri.startsWith("http", ignoreCase = true) -> {
+                    logger.log("Playing URL: $uri")
+                    mediaPlayer.PlayURL(WString(uri))
+                }
                 else -> {
                     val file = File(uri)
                     if (!file.exists()) throw FileNotFoundException("File not found: $uri")
+                    logger.log("Playing file: ${file.absolutePath}")
                     mediaPlayer.PlayFile(WString(file.absolutePath))
                 }
             }
+            logger.log("PlayFile/URL returned HR=0x${hr.toString(16)}") // Ajout de log
             if (hr < 0) {
                 handleError("Unable to open (HR=0x${hr.toString(16)})")
                 return
@@ -394,16 +411,37 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
     private fun onMediaEvent(eventType: Int, hr: Int) {
         logger.log("onMediaEvent: $eventType (HR=0x${hr.toString(16)})")
         when (eventType) {
-            MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> updateProgressFromPlayer()
-            MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> handlePlaybackStarted()
+            MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> {
+                logger.log("Media item set event received")
+                updateProgressFromPlayer()
+                videoMetrics.getAspectRatio()?.let { ratio ->
+                    logger.log("Video aspect ratio: $ratio")
+                } ?: logger.error("Could not get video aspect ratio")
+            }
+            MediaPlayerLib.MP_EVENT_PLAYBACK_STARTED -> {
+                logger.log("Playback started event received")
+                handlePlaybackStarted()
+            }
             MediaPlayerLib.MP_EVENT_PLAYBACK_PAUSED -> {
-                logger.log("Playback paused")
+                logger.log("Playback paused event received")
                 _isPlaying = false
             }
-            MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> handlePlaybackStopped()
-            MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> handlePlaybackError(hr)
-            MediaPlayerLib.MP_EVENT_LOADING_STARTED -> handleLoadingStarted()
-            MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> handleLoadingComplete()
+            MediaPlayerLib.MP_EVENT_PLAYBACK_STOPPED -> {
+                logger.log("Playback stopped event received")
+                handlePlaybackStopped()
+            }
+            MediaPlayerLib.MP_EVENT_PLAYBACK_ERROR -> {
+                logger.log("Playback error event received with error code: $hr")
+                handlePlaybackError(hr)
+            }
+            MediaPlayerLib.MP_EVENT_LOADING_STARTED -> {
+                logger.log("Loading started event received")
+                handleLoadingStarted()
+            }
+            MediaPlayerLib.MP_EVENT_LOADING_COMPLETE -> {
+                logger.log("Loading complete event received")
+                handleLoadingComplete()
+            }
             MediaPlayerLib.MP_EVENT_PLAYBACK_ENDED -> {
                 logger.log("Playback ended event received")
                 handlePlaybackEnded()
@@ -477,25 +515,6 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                     logger.log("Loop completed in handlePlaybackEnded")
                 } catch (e: Exception) {
                     logger.error("Loop failed in handlePlaybackEnded: ${e.message}")
-                }
-            }
-        }
-    }
-
-    private fun handleReachingEnd() {
-        logger.log("handleReachingEnd - loop: $_loop, isPlaying: $_isPlaying")
-        if (_loop && _isPlaying) {
-            coroutineScope.launch(Dispatchers.Main) {
-                try {
-                    mediaSlider.setProgress(0f)
-                    _currentTime = 0.0
-                    _progress = 0f
-                    mediaPlayer.StopPlayback()
-                    delay(50)
-                    mediaPlayer.ResumePlayback()
-                    logger.log("End handling completed")
-                } catch (e: Exception) {
-                    logger.error("End handling failed: ${e.message}")
                 }
             }
         }

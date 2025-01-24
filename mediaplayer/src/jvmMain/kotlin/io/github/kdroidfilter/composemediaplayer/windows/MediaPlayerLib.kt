@@ -77,4 +77,6 @@ interface MediaPlayerLib : StdCallLibrary {
     fun GetCurrentPosition(pPosition: LongByReference): Int
     fun SetPosition(position: Long): Int
 
+    fun GetVideoAspectRatio(pRatio: FloatByReference): Int
+
 }
