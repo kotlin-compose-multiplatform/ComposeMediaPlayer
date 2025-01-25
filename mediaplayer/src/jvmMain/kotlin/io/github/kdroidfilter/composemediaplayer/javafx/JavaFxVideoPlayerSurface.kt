@@ -1,7 +1,10 @@
 package io.github.kdroidfilter.composemediaplayer.javafx
+
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
 import javafx.application.Platform
@@ -24,9 +27,14 @@ fun JavaFxVideoPlayerSurface(
     playerState: JavaFxVideoPlayerState,
     modifier: Modifier
 ) {
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        val swingPanelModifier =
+            if (!playerState.hasMedia) Modifier else Modifier.fillMaxHeight().aspectRatio(playerState.aspectRatio)
         SwingPanel(
-            modifier = Modifier.fillMaxSize(),
+            modifier = swingPanelModifier,
             factory = {
                 val jfxPanel = JFXPanel()
 
