@@ -261,6 +261,7 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 ### Linux
 ![Linux Sample](assets/screenshots/linux_sample.png)
 
+### Android
 <p align="center">
   <img src="assets/screenshots/android_sample.png" alt="Android Sample" height="500">
 </p>
