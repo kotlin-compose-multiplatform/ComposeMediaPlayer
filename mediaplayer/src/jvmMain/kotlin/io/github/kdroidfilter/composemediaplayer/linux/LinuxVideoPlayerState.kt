@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import org.freedesktop.gstreamer.Bus
 import org.freedesktop.gstreamer.Element
@@ -114,7 +115,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     // endregion
     private var lastAspectRatioUpdateTime: Long = 0
     private val ASPECT_RATIO_DEBOUNCE_MS = 500
-    private var _aspectRatio by mutableStateOf(16f/9f) // Ratio par défaut
+    private var _aspectRatio by mutableStateOf(DEFAULT_ASPECT_RATIO)
     val aspectRatio: Float
         get() = _aspectRatio
 

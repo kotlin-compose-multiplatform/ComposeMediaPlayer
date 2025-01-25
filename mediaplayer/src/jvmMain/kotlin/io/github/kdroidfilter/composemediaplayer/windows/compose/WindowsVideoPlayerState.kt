@@ -10,6 +10,7 @@ import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
@@ -124,7 +125,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         private set
 
     // In WindowsVideoPlayerState class
-    private var _aspectRatio by mutableStateOf(16f/9f) // Default 16:9
+    private var _aspectRatio by mutableStateOf(DEFAULT_ASPECT_RATIO)
     val aspectRatio: Float
         get() = _aspectRatio
 
@@ -437,7 +438,7 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
                     _aspectRatio = ratio  // Update the aspect ratio
                     logger.log("Video aspect ratio: $ratio")
                 } ?: run {
-                    _aspectRatio = 16f/9f  // Fall back to 16:9 if we can't get the ratio
+                    _aspectRatio =  DEFAULT_ASPECT_RATIO // Fall back to 16:9 if we can't get the ratio
                     logger.error("Could not get video aspect ratio")
                 }
             }

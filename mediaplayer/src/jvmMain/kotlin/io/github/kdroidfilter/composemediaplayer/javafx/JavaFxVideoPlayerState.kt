@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import javafx.application.Platform
 import javafx.scene.media.Media
@@ -18,7 +19,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private var currentMediaView: MediaView? = null
     internal var mediaPlayer: MediaPlayer? = null
 
-    private var _aspectRatio by mutableStateOf(16f/9f) // Default to 16:9
+    private var _aspectRatio by mutableStateOf(DEFAULT_ASPECT_RATIO) // Default to 16:9
     val aspectRatio: Float get() = _aspectRatio
 
     // Basic states
@@ -292,7 +293,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
             _aspectRatio = if (width > 0 && height > 0) {
                 width.toFloat() / height.toFloat()
             } else {
-                16f/9f // Default aspect ratio if dimensions are not available
+                DEFAULT_ASPECT_RATIO // Default aspect ratio if dimensions are not available
             }
 
             player.play()
