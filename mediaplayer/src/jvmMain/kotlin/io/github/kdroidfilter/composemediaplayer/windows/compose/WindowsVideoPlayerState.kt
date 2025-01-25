@@ -10,6 +10,7 @@ import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
 import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.onEach
 import java.awt.Canvas
 import java.io.File
 import java.io.FileNotFoundException
-import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class WindowsVideoPlayerState : PlatformVideoPlayerState {
@@ -550,17 +550,4 @@ class WindowsVideoPlayerState : PlatformVideoPlayerState {
         logger.error(message)
     }
 
-    // Format hh:mm:ss or mm:ss
-    private fun formatTime(value: Double): String {
-        val duration = Duration.ofSeconds(value.toLong())
-        val hours = duration.toHours().toInt()
-        val minutes = duration.toMinutesPart()
-        val seconds = duration.toSecondsPart()
-
-        return if (hours > 0) {
-            String.format("%02d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format("%02d:%02d", minutes, seconds)
-        }
-    }
 }

@@ -6,13 +6,13 @@ import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import javafx.application.Platform
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
 import javafx.scene.media.MediaView
 import javafx.util.Duration
 import java.io.File
-import java.time.Duration.ofSeconds
 
 class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     private var currentMediaView: MediaView? = null
@@ -387,18 +387,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    private fun formatTime(seconds: Double): String {
-        val duration = ofSeconds(seconds.toLong())
-        val hours = duration.toHours()
-        val minutes = duration.toMinutesPart()
-        val secs = duration.toSecondsPart()
 
-        return if (hours > 0) {
-            String.format("%02d:%02d:%02d", hours, minutes, secs)
-        } else {
-            String.format("%02d:%02d", minutes, secs)
-        }
-    }
 
     private fun runOnFxThread(action: () -> Unit) {
         if (Platform.isFxApplicationThread()) {
