@@ -249,9 +249,21 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 
 ## 📊 Roadmap
 
+- **Buffering Detection**: Implement functionality to detect and handle buffering events during playback via an `isLoading` state.
 - **iOS and WebAssembly (WasmJS) Support**: Expand support to additional platforms to enhance compatibility.
 - **Audio Player**: Introduce a standalone audio player for handling audio-only content.
 - **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
+- **Metadata Support**: Add support for extracting the following metadata:
+    - Title
+    - Artist
+    - Duration (in milliseconds)
+    - Video resolution (width and height)
+    - Bitrate (in bits per second)
+    - Frame rate
+    - MIME type
+    - Audio channels
+    - Audio sample rate
+
 
 ## 🟎️ Screenshots of the [Demo App](sample/composeApp/src/commonMain/kotlin/sample/app/App.kt)
 
