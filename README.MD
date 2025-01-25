@@ -41,6 +41,17 @@ dependencies {
 ```
 
 > [!IMPORTANT]
+>It is necessary (for now) to add the following Maven repository to your dependencies because Compose Media Player relies on a snapshot version of the [FileKt core](https://github.com/vinceglb/FileKit/tree/main/filekit-core):
+
+```kotlin
+repositories {
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+}
+```
+
+For more information, visit: [FileKt on GitHub](https://github.com/vinceglb/FileKit/)
+
+> [!IMPORTANT]
 > Currently, you also need to manually include JavaFX dependencies if your application is also intended for macOS.
 
 ```kotlin
