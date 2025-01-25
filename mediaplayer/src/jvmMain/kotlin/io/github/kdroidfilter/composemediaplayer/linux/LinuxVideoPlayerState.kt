@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import org.freedesktop.gstreamer.Bus
 import org.freedesktop.gstreamer.Element
 import org.freedesktop.gstreamer.ElementFactory
@@ -19,8 +20,6 @@ import org.freedesktop.gstreamer.State.READY
 import org.freedesktop.gstreamer.TagList
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
-import org.freedesktop.gstreamer.message.Message
-import org.freedesktop.gstreamer.message.MessageType
 import org.freedesktop.gstreamer.swing.GstVideoComponent
 import java.awt.EventQueue
 import java.io.File
@@ -254,8 +253,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
                     if (pos > 0) {
                         EventQueue.invokeLater {
-                            _positionText = formatTimeNs(pos)
-                            _durationText = formatTimeNs(dur)
+                            _positionText = formatTime(pos, true)
+                            _durationText = formatTime(dur, true)
                         }
                     }
                 }
@@ -306,18 +305,6 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    private fun formatTimeNs(ns: Long): String {
-        val totalSeconds = ns / 1_000_000_000L
-        val seconds = totalSeconds % 60
-        val minutes = (totalSeconds / 60) % 60
-        val hours = totalSeconds / 3600
-
-        return if (hours > 0) {
-            String.format("%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format("%d:%02d", minutes, seconds)
-        }
-    }
 
     override fun openUri(uri: String) {
         stop() // This will also set _isPlaying to false
@@ -387,12 +374,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
             val relPos = value / 1000f
             val seekPos = (relPos * dur.toDouble()).toLong()
-            _positionText = formatTimeNs(seekPos)
+            _positionText = formatTime(seekPos, true)
 
             playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE), seekPos)
 
             EventQueue.invokeLater {
-                _positionText = formatTimeNs(seekPos)
+                _positionText = formatTime(seekPos, true)
             }
         }
     }

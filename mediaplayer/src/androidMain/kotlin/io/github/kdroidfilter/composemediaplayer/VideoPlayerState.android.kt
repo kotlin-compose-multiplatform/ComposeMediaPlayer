@@ -13,6 +13,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.kdroid.androidcontextprovider.ContextProvider
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.CoroutineScope
@@ -289,15 +290,4 @@ actual open class VideoPlayerState {
         resetStates()
     }
 
-    private fun formatTime(seconds: Double): String {
-        val hours = (seconds / 3600).toInt()
-        val minutes = ((seconds % 3600) / 60).toInt()
-        val secs = (seconds % 60).toInt()
-
-        return if (hours > 0) {
-            String.format("%02d:%02d:%02d", hours, minutes, secs)
-        } else {
-            String.format("%02d:%02d", minutes, secs)
-        }
-    }
 }
