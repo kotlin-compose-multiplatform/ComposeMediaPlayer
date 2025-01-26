@@ -34,7 +34,10 @@ kotlin {
 
     androidTarget { publishLibraryVariants("release") }
     jvm()
-    wasmJs { browser() }
+    wasmJs {
+        browser()
+        binaries.executable()
+    }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -82,6 +85,7 @@ kotlin {
         wasmJsMain.dependencies {
             implementation(libs.kotlinx.browser.wasm.js)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-wasm-js:1.10.1")
+            implementation(npm("audio-context", "1.0.3"))
 
         }
 
