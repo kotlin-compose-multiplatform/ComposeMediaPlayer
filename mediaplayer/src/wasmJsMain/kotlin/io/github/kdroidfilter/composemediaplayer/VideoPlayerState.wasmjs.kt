@@ -6,6 +6,7 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.name
 import kotlinx.coroutines.*
 import kotlinx.io.IOException
+import org.w3c.dom.url.URL
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -136,6 +137,8 @@ actual open class VideoPlayerState {
         playerScope.cancel()
     }
 }
+
 fun PlatformFile.toUriString(): String {
-    return "file://${this}" // TODO
+    return URL.createObjectURL(this.file)
 }
+
