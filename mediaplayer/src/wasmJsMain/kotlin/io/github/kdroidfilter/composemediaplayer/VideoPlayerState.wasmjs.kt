@@ -7,11 +7,13 @@ import io.github.vinceglb.filekit.name
 import kotlinx.coroutines.*
 import kotlinx.io.IOException
 import org.w3c.dom.url.URL
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 @Stable
 actual open class VideoPlayerState {
+
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var lastUpdateTime = TimeSource.Monotonic.markNow()
 
@@ -51,6 +53,8 @@ actual open class VideoPlayerState {
     actual val positionText: String get() = _positionText
     actual val durationText: String get() = _durationText
 
+    internal var seekJob: Job? = null
+
     actual fun openUri(uri: String) {
         playerScope.coroutineContext.cancelChildren()
 
@@ -62,8 +66,9 @@ actual open class VideoPlayerState {
 
         playerScope.launch {
             try {
-                _isLoading = false
+                // Simuler le chargement (à remplacer par le chargement réel des métadonnées si nécessaire)
                 delay(100)
+                _isLoading = false
                 _isPlaying = true
             } catch (e: Exception) {
                 _isLoading = false
@@ -104,6 +109,17 @@ actual open class VideoPlayerState {
 
     actual fun seekTo(value: Float) {
         sliderPos = value
+
+        // Annuler toute recherche en attente
+        seekJob?.cancel()
+
+        // Déclencher le seek après un délai (par exemple, 300ms)
+        seekJob = playerScope.launch {
+            delay(300) // Délai de debounce
+            if (!userDragging && _hasMedia) {
+                // Le seek sera géré dans VideoPlayerSurface via l'observation de sliderPos
+            }
+        }
     }
 
     actual fun clearError() {
@@ -115,30 +131,37 @@ actual open class VideoPlayerState {
         _rightLevel = right
     }
 
+    private var _currentDuration: Float = 0f
+
     fun updatePosition(currentTime: Float, duration: Float) {
         val now = TimeSource.Monotonic.markNow()
         if (now - lastUpdateTime >= 1.seconds) {
-            // Check if currentTime or duration is NaN and set to "00:00" if true
             _positionText = if (currentTime.isNaN()) "00:00" else formatTime(currentTime)
             _durationText = if (duration.isNaN()) "00:00" else formatTime(duration)
 
-            if (!userDragging && duration != 0f && !duration.isNaN()) {
-                sliderPos = (currentTime / duration) * 1000
-            } else {
-                sliderPos = 0.0f
+            if (!userDragging && duration > 0f && !duration.isNaN()) {
+                sliderPos = (currentTime / duration) * PERCENTAGE_MULTIPLIER
             }
 
+            _currentDuration = duration
             lastUpdateTime = now
         }
     }
 
+    // Fonction pour gérer l'événement "timeupdate"
+    fun onTimeUpdate(currentTime: Float, duration: Float) {
+        updatePosition(currentTime, duration)
+    }
 
     actual fun dispose() {
         playerScope.cancel()
+    }
+
+    companion object {
+        internal const val PERCENTAGE_MULTIPLIER = 1000f
     }
 }
 
 fun PlatformFile.toUriString(): String {
     return URL.createObjectURL(this.file)
 }
-
