@@ -92,7 +92,22 @@ Before using Compose Media Player, you need to create a state for the video play
 val playerState = rememberVideoPlayerState()
 ```
 
-Once the state is initialized, you can use it to control playback, manage volume, progress, and more.
+### Displaying the Video Surface
+
+After initializing the player state, you can display the surface of the video using `VideoPlayerSurface`:
+
+```kotlin
+// Video Surface
+Box(
+    modifier = Modifier.weight(1f).fillMaxWidth(),
+    contentAlignment = Alignment.Center
+) {
+    VideoPlayerSurface(
+        playerState = playerState,
+        modifier = Modifier.fillMaxSize()
+    )
+}
+```
 
 ### Video Playback via URL or Local Files
 
@@ -102,7 +117,8 @@ You can play a video by providing a direct URL:
 playerState.openUri("http://example.com/video.mp4")
 ```
 
-To play a local video file, please refer to [example](sample/composeApp/src/commonMain/kotlin/sample/app/App.kt) using [FileKt](https://github.com/vinceglb/FileKit)
+To play a local video file, please refer to [example](sample/composeApp/src/commonMain/kotlin/sample/app/App.kt) using [FileKt](https://github.com/vinceglb/FileKit).
+
 
 ### Full Controls
 
