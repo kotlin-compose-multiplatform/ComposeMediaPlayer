@@ -46,7 +46,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.coroutines.test)
             api(libs.filekit.core)
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+            implementation(libs.kotlinx.datetime)
 
         }
 
@@ -59,6 +59,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.ui)
+
 
         }
 
