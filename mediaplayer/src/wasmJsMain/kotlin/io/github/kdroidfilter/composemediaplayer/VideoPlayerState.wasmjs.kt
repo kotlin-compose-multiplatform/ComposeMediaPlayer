@@ -66,9 +66,8 @@ actual open class VideoPlayerState {
 
         playerScope.launch {
             try {
-                // Simuler le chargement (à remplacer par le chargement réel des métadonnées si nécessaire)
-                delay(100)
                 _isLoading = false
+                delay(100)
                 _isPlaying = true
             } catch (e: Exception) {
                 _isLoading = false
