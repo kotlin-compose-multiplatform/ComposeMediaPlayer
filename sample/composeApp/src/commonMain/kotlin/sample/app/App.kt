@@ -13,11 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
@@ -52,14 +50,22 @@ fun App() {
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // En-tête
-                Text(
-                    "Compose Media Player",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    // En-tête
+                    Text(
+                        "Compose Media Player",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Box{
+                        if(playerState.isLoading){
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
 
                 // Zone vidéo
                 Box(
@@ -70,23 +76,48 @@ fun App() {
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
-
                     VideoPlayerSurface(
                         playerState = playerState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp)),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Timeline
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Slider(
+                        value = playerState.sliderPos,
+                        onValueChange = {
+                            playerState.sliderPos = it
+                            playerState.userDragging = true
+                        },
+                        onValueChangeFinished = {
+                            playerState.userDragging = false
+                            playerState.seekTo(playerState.sliderPos)
+                        },
+                        valueRange = 0f..1000f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+                        )
                     )
 
-                    if (playerState.isLoading) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .zIndex(1f),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            playerState.positionText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            playerState.durationText,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
 
@@ -133,42 +164,6 @@ fun App() {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Timeline
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Slider(
-                        value = playerState.sliderPos,
-                        onValueChange = {
-                            playerState.sliderPos = it
-                            playerState.userDragging = true
-                        },
-                        onValueChangeFinished = {
-                            playerState.userDragging = false
-                            playerState.seekTo(playerState.sliderPos)
-                        },
-                        valueRange = 0f..1000f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
-                        )
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            playerState.positionText,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            playerState.durationText,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
