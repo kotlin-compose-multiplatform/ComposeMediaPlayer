@@ -61,14 +61,13 @@ actual open class VideoPlayerState {
 
         _sourceUri = uri
         _hasMedia = true
-        _isLoading = true
+        _isLoading = true  // Set initial loading state
         _error = null
         _isPlaying = false
 
-        // Suppression du delay(100) pour démarrer plus rapidement
+        // Don't set isLoading to false here - let the video events handle it
         playerScope.launch {
             try {
-                _isLoading = false
                 _isPlaying = true
             } catch (e: Exception) {
                 _isLoading = false

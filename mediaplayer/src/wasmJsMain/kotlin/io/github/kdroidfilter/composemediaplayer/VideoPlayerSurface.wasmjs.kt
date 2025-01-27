@@ -98,15 +98,50 @@ private fun setupVideoElement(
     video.removeEventListener("timeupdate", playerState::onTimeUpdateEvent)
     video.addEventListener("timeupdate", playerState::onTimeUpdateEvent)
 
-    // Attendre le chargement des métadonnées
+    // Événement déclenché quand la vidéo attend des données (buffering)
+    video.addEventListener("waiting", {
+        scope.launch {
+            delay(100)
+            playerState._isLoading = true
+        }
+    })
+
+    // Événement déclenché quand la vidéo peut commencer ou reprendre la lecture
+    video.addEventListener("playing", {
+        scope.launch {
+            playerState._isLoading = false
+        }
+    })
+
+    // Événement déclenché quand la vidéo peut être lue jusqu'au bout sans interruption
+    video.addEventListener("canplaythrough", {
+        scope.launch {
+            playerState._isLoading = false
+        }
+    })
+
+    video.addEventListener("canplay", {
+        scope.launch {
+            playerState._isLoading = false
+        }
+    })
+
+    video.addEventListener("suspend", {
+        scope.launch {
+            // Only set loading to false if we have enough data to play
+            if (video.readyState >= 3) { // HAVE_FUTURE_DATA or better
+                playerState._isLoading = false
+            }
+        }
+    })
+
+    // Écouteur pour les métadonnées
     video.addEventListener("loadedmetadata", {
-        // Démarrer la lecture si l'état l'autorise (et si autoplay n'est pas bloqué par le navigateur)
         if (playerState.isPlaying) {
             try {
                 video.play()
             } catch (e: Exception) {
                 println("Error opening media: ${e.message}")
-
             }
         }
     })
@@ -115,7 +150,7 @@ private fun setupVideoElement(
     video.volume = playerState.volume.toDouble()
     video.loop = playerState.loop
 
-    // Si la source est déjà prête, on peut initialiser la lecture
+    // Lecture si la source est définie et l'état l'autorise
     if (video.src.isNotEmpty() && playerState.isPlaying) {
         try {
             video.play()
