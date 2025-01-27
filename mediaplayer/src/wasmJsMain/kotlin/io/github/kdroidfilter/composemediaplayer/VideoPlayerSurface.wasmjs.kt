@@ -98,10 +98,23 @@ private fun setupVideoElement(
     video.removeEventListener("timeupdate", playerState::onTimeUpdateEvent)
     video.addEventListener("timeupdate", playerState::onTimeUpdateEvent)
 
+    // Événement déclenché quand la vidéo commence une opération de seek
+    video.addEventListener("seeking", {
+        scope.launch {
+            playerState._isLoading = true
+        }
+    })
+
+    // Événement déclenché quand l'opération de seek est terminée
+    video.addEventListener("seeked", {
+        scope.launch {
+            playerState._isLoading = false
+        }
+    })
+
     // Événement déclenché quand la vidéo attend des données (buffering)
     video.addEventListener("waiting", {
         scope.launch {
-            delay(100)
             playerState._isLoading = true
         }
     })
@@ -120,6 +133,7 @@ private fun setupVideoElement(
         }
     })
 
+    // Événement pour l'état "can play"
     video.addEventListener("canplay", {
         scope.launch {
             playerState._isLoading = false
@@ -128,20 +142,30 @@ private fun setupVideoElement(
 
     video.addEventListener("suspend", {
         scope.launch {
-            // Only set loading to false if we have enough data to play
-            if (video.readyState >= 3) { // HAVE_FUTURE_DATA or better
+            // Ne mettre isLoading à false que si nous avons assez de données pour jouer
+            if (video.readyState >= 3) { // HAVE_FUTURE_DATA ou mieux
                 playerState._isLoading = false
             }
         }
     })
 
+    // Écouteur pour les erreurs de lecture
+    video.addEventListener("error", {
+        scope.launch {
+            playerState._isLoading = false
+        }
+    })
+
     // Écouteur pour les métadonnées
     video.addEventListener("loadedmetadata", {
-        if (playerState.isPlaying) {
-            try {
-                video.play()
-            } catch (e: Exception) {
-                println("Error opening media: ${e.message}")
+        scope.launch {
+            playerState._isLoading = false
+            if (playerState.isPlaying) {
+                try {
+                    video.play()
+                } catch (e: Exception) {
+                    println("Error opening media: ${e.message}")
+                }
             }
         }
     })
