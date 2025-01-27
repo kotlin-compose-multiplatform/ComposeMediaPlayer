@@ -3,11 +3,16 @@ package io.github.kdroidfilter.composemediaplayer
 import androidx.compose.runtime.*
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.name
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.io.IOException
 import org.w3c.dom.url.URL
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -17,7 +22,6 @@ actual open class VideoPlayerState {
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var lastUpdateTime = TimeSource.Monotonic.markNow()
 
-    // Core State
     private var _sourceUri by mutableStateOf<String?>(null)
     val sourceUri: String? get() = _sourceUri
 
@@ -35,22 +39,19 @@ actual open class VideoPlayerState {
 
     actual val metadata = VideoMetadata()
 
-    // Playback Controls
     actual var volume by mutableStateOf(1.0f)
     actual var sliderPos by mutableStateOf(0.0f)
     actual var userDragging by mutableStateOf(false)
     actual var loop by mutableStateOf(false)
 
-    // Audio Levels
     private var _leftLevel by mutableStateOf(0f)
     private var _rightLevel by mutableStateOf(0f)
     actual val leftLevel: Float get() = _leftLevel
     actual val rightLevel: Float get() = _rightLevel
 
-    // Time Display
     private var _positionText by mutableStateOf("00:00")
     private var _durationText by mutableStateOf("00:00")
-    actual val positionText: String get() = _positionText
+    actual  val positionText: String get() = _positionText
     actual val durationText: String get() = _durationText
 
     internal var seekJob: Job? = null
@@ -64,10 +65,10 @@ actual open class VideoPlayerState {
         _error = null
         _isPlaying = false
 
+        // Suppression du delay(100) pour démarrer plus rapidement
         playerScope.launch {
             try {
                 _isLoading = false
-                delay(100)
                 _isPlaying = true
             } catch (e: Exception) {
                 _isLoading = false
@@ -84,13 +85,13 @@ actual open class VideoPlayerState {
         openUri(fileUri)
     }
 
-    actual fun play() {
+    actual  fun play() {
         if (_hasMedia && !_isPlaying) {
             _isPlaying = true
         }
     }
 
-    actual fun pause() {
+    actual  fun pause() {
         if (_isPlaying) {
             _isPlaying = false
         }
@@ -106,19 +107,9 @@ actual open class VideoPlayerState {
         _durationText = "00:00"
     }
 
-    actual fun seekTo(value: Float) {
+    actual  fun seekTo(value: Float) {
         sliderPos = value
-
-        // Annuler toute recherche en attente
         seekJob?.cancel()
-
-        // Déclencher le seek après un délai (par exemple, 300ms)
-        seekJob = playerScope.launch {
-            delay(300) // Délai de debounce
-            if (!userDragging && _hasMedia) {
-                // Le seek sera géré dans VideoPlayerSurface via l'observation de sliderPos
-            }
-        }
     }
 
     actual fun clearError() {
@@ -141,13 +132,11 @@ actual open class VideoPlayerState {
             if (!userDragging && duration > 0f && !duration.isNaN()) {
                 sliderPos = (currentTime / duration) * PERCENTAGE_MULTIPLIER
             }
-
             _currentDuration = duration
             lastUpdateTime = now
         }
     }
 
-    // Fonction pour gérer l'événement "timeupdate"
     fun onTimeUpdate(currentTime: Float, duration: Float) {
         updatePosition(currentTime, duration)
     }

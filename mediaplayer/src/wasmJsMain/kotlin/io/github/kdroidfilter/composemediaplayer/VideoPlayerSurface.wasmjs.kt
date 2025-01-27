@@ -95,29 +95,33 @@ private fun setupVideoElement(
     playerState: VideoPlayerState,
     scope: CoroutineScope
 ) {
-    // Nettoyer les anciens écouteurs pour éviter les doublons
+    // Nettoyer les anciens écouteurs
     video.removeEventListener("timeupdate", playerState::onTimeUpdateEvent)
     video.addEventListener("timeupdate", playerState::onTimeUpdateEvent)
 
-    // Initialiser le volume et le loop
+    // Attendre le chargement des métadonnées
+    video.addEventListener("loadedmetadata", {
+        // Démarrer la lecture si l'état l'autorise (et si autoplay n'est pas bloqué par le navigateur)
+        if (playerState.isPlaying) {
+            try {
+                video.play()
+            } catch (e: Exception) {
+                println("Error opening media: ${e.message}")
+
+            }
+        }
+    })
+
+    // Appliquer volume, loop, etc.
     video.volume = playerState.volume.toDouble()
     video.loop = playerState.loop
 
-    // Gérer le play/pause initial
-    if (playerState.isPlaying) {
-        video.play()
-    } else {
-        video.pause()
-    }
-
-    // Gérer le seek initial si nécessaire
-    scope.launch {
-        if (playerState.sliderPos > 0f) {
-            val duration = video.duration.toFloat()
-            if (duration > 0f) {
-                val newTime = (playerState.sliderPos / VideoPlayerState.PERCENTAGE_MULTIPLIER) * duration
-                video.currentTime = newTime.toDouble()
-            }
+    // Si la source est déjà prête, on peut initialiser la lecture
+    if (video.src.isNotEmpty() && playerState.isPlaying) {
+        try {
+            video.play()
+        } catch (e: Exception) {
+            println("Error opening media: ${e.message}")
         }
     }
 }
