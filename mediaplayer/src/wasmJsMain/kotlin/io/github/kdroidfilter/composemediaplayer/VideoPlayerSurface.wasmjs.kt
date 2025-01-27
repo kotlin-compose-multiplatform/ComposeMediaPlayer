@@ -65,7 +65,6 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
     LaunchedEffect(playerState.sliderPos) {
         if (!playerState.userDragging && playerState.hasMedia) {
             val job = scope.launch {
-                delay(300) // Délai de debounce
                 val duration = videoElement?.duration?.toFloat() ?: 0f
                 if (duration > 0f) {
                     val newTime = (playerState.sliderPos / VideoPlayerState.PERCENTAGE_MULTIPLIER) * duration
