@@ -8,6 +8,7 @@ import com.sun.jna.platform.win32.WinDef.BOOLByReference
 import com.sun.jna.ptr.FloatByReference
 import com.sun.jna.ptr.LongByReference
 import com.sun.jna.win32.StdCallLibrary
+import io.github.kdroidfilter.composemediaplayer.util.logger
 
 internal interface MediaPlayerLib : StdCallLibrary {
     companion object {
@@ -26,7 +27,7 @@ internal interface MediaPlayerLib : StdCallLibrary {
         val INSTANCE: MediaPlayerLib by lazy {
             try {
                 Native.load("simpleplayer", MediaPlayerLib::class.java).also {
-                    println("MediaPlayerLib loaded successfully")
+                    logger.debug{ "MediaPlayerLib loaded successfully" }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
