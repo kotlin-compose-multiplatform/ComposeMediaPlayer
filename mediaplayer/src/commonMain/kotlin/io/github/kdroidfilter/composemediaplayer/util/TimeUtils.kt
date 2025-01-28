@@ -29,7 +29,7 @@ internal fun formatTime(value: Number, isNanoseconds: Boolean = false): String {
     val minutes = dateTime.minute
     val seconds = dateTime.second
 
-    // Build the final string without using Java's String.format
+    // Build the final string
     return if (hours > 0) {
         "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
     } else {
