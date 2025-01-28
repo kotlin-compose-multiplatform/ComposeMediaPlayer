@@ -3,8 +3,10 @@ package io.github.kdroidfilter.composemediaplayer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 
+@UnstableApi
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
     AndroidView(
