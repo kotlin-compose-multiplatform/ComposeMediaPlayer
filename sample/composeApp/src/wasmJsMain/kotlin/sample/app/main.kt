@@ -9,8 +9,10 @@ import sample.app.App
 fun main() {
     CanvasBasedWindow(canvasElementId = "ComposeTarget", title = "Compose Media Player") {
         CompositionLocalProvider(LocalLayerContainer provides document.body!!) {
+            appLoaded()
             App()
         }
     }
 }
 
+external fun appLoaded()
