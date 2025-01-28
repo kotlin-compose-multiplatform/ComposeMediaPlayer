@@ -1,8 +1,7 @@
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.CanvasBasedWindow
-import androidx.compose.ui.window.ComposeViewport
-import io.github.kdroidfilter.composemediaplayer.LocalLayerContainer
+import io.github.kdroidfilter.composemediaplayer.htmlinterop.LocalLayerContainer
 import kotlinx.browser.document
 import sample.app.App
 

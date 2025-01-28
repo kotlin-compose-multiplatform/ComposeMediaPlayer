@@ -8,7 +8,7 @@
  */
 
 
-package io.github.kdroidfilter.composemediaplayer
+package io.github.kdroidfilter.composemediaplayer.htmlinterop
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
@@ -128,7 +128,7 @@ private fun changeCoordinates(element: Element,width: Float,height: Float,x: Flo
 
 
 @Composable
-fun <T : Element> HtmlView(
+internal fun <T : Element> HtmlView(
     factory: Document.() -> T,
     modifier: Modifier = Modifier,
     update: (T) -> Unit = NoOpUpdate

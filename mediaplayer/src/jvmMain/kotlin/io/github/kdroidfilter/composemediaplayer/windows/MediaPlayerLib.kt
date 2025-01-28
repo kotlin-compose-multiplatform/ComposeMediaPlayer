@@ -9,7 +9,7 @@ import com.sun.jna.ptr.FloatByReference
 import com.sun.jna.ptr.LongByReference
 import com.sun.jna.win32.StdCallLibrary
 
-interface MediaPlayerLib : StdCallLibrary {
+internal interface MediaPlayerLib : StdCallLibrary {
     companion object {
         // Events constants
         const val MP_EVENT_MEDIAITEM_CREATED   = 1

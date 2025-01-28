@@ -1,6 +1,6 @@
 @file:Suppress("unused")
 
-package io.github.kdroidfilter.composemediaplayer
+package io.github.kdroidfilter.composemediaplayer.jsinterop
 
 import kotlin.js.JsAny
 import org.khronos.webgl.Float32Array

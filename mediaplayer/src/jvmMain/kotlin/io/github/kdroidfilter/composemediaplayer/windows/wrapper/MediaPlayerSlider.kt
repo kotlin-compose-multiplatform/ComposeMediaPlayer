@@ -3,7 +3,7 @@ package io.github.kdroidfilter.composemediaplayer.windows.wrapper
 import com.sun.jna.ptr.LongByReference
 import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 
-class MediaPlayerSlider(private val mediaPlayer: MediaPlayerLib) {
+class MediaPlayerSlider internal constructor(private val mediaPlayer: MediaPlayerLib) {
     /**
      * Gets the total duration of the media in seconds
      * @return The duration in seconds, or null if an error occurs

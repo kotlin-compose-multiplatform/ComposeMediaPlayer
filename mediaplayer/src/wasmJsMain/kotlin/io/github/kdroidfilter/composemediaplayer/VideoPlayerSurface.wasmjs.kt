@@ -2,6 +2,8 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import io.github.kdroidfilter.composemediaplayer.htmlinterop.HtmlView
+import io.github.kdroidfilter.composemediaplayer.util.logger
 import kotlinx.browser.document
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
 import kotlin.math.abs
+
 
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
@@ -99,11 +102,11 @@ fun setupVideoElement(
     scope: CoroutineScope,
     enableAudioDetection: Boolean = true
 ) {
-    println("Setup video => enableAudioDetection = $enableAudioDetection")
+    logger.debug { "Setup video => enableAudioDetection = $enableAudioDetection" }
 
     // Create analyzer only if enableAudioDetection is true
     val audioAnalyzer = if (enableAudioDetection) {
-        VideoAudioAnalyzer(video)
+        AudioLevelProcessor(video)
     } else null
 
     var initializationJob: Job? = null
@@ -119,16 +122,16 @@ fun setupVideoElement(
 
     // loadedmetadata => attempt initialization
     video.addEventListener("loadedmetadata") {
-        println("Video => loadedmetadata => init analyzer if enabled")
+        logger.debug { "Video => loadedmetadata => init analyzer if enabled" }
         initAudioAnalyzer()
     }
 
     // play => re-init
     video.addEventListener("play") {
-        println("Video => play => init analyzer if needed")
+        logger.debug { "Video => play => init analyzer if needed" }
 
         if (!enableAudioDetection) {
-            println("Audio detection disabled => no analyzer.")
+            logger.debug { "Audio detection disabled => no analyzer." }
         } else if (initializationJob?.isActive != true) {
             initAudioAnalyzer()
         }
@@ -136,7 +139,7 @@ fun setupVideoElement(
         // Loop => read levels only if analyzer is not null
         if (enableAudioDetection) {
             scope.launch {
-                println("Starting audio level update loop")
+                logger.debug { "Starting audio level update loop" }
                 while (true) {
                     val (left, right) = audioAnalyzer?.getAudioLevels() ?: (0f to 0f)
                     playerState.updateAudioLevels(left, right)
@@ -180,7 +183,7 @@ fun setupVideoElement(
     video.addEventListener("error") {
         scope.launch {
             playerState._isLoading = false
-            println("Video => error => possibly no audio analyzer if CORS issues.")
+            logger.error { "Video => error => possibly no audio analyzer if CORS issues." }
         }
     }
 
@@ -192,7 +195,7 @@ fun setupVideoElement(
                 try {
                     video.play()
                 } catch (e: Exception) {
-                    println("Error opening media: ${e.message}")
+                    logger.error(e) { "Error opening media: ${e.message}" }
                 }
             }
         }
@@ -207,7 +210,7 @@ fun setupVideoElement(
         try {
             video.play()
         } catch (e: Exception) {
-            println("Error opening media: ${e.message}")
+            logger.error(e) { "Error opening media: ${e.message}" }
         }
     }
 }

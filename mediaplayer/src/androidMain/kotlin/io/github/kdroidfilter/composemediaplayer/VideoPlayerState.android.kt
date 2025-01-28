@@ -14,6 +14,7 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.kdroid.androidcontextprovider.ContextProvider
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
+import io.github.kdroidfilter.composemediaplayer.util.logger
 import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.coroutines.CoroutineScope
@@ -222,7 +223,7 @@ actual open class VideoPlayerState {
                 player.play()
                 _hasMedia = true  // Set to true when media is loaded
             } catch (e: Exception) {
-                println("Error opening media: ${e.message}")
+                logger.debug{"Error opening media: ${e.message}"}
                 _isPlaying = false
                 _hasMedia = false  // Set to false on error
                 _error = VideoPlayerError.SourceError("Failed to load media: ${e.message}")

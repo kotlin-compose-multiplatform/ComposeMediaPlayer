@@ -1,6 +1,6 @@
 package io.github.kdroidfilter.composemediaplayer.windows.ui
 
-import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
+import io.github.kdroidfilter.composemediaplayer.util.logger
 import java.awt.Canvas
 import java.awt.Graphics
 import java.awt.event.ComponentAdapter
@@ -11,14 +11,13 @@ import java.awt.event.ComponentEvent
  * UpdateVideo() is called only when the Canvas is resized.
  */
 class VideoCanvas : Canvas() {
-    private val logger = Logger("VideoCanvas")
     var onResize: (() -> Unit)? = null  // Callback to handle resize events
 
     init {
         isVisible = true
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
-                logger.log("Canvas resized to: ${width}x${height}")
+                logger.debug {"Canvas resized to: ${width}x${height}"}
                 onResize?.invoke()
             }
         })

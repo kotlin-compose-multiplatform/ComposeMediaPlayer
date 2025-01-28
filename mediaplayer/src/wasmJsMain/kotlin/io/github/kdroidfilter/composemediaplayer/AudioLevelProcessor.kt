@@ -1,10 +1,14 @@
 package io.github.kdroidfilter.composemediaplayer
 
+import io.github.kdroidfilter.composemediaplayer.jsinterop.AnalyserNode
+import io.github.kdroidfilter.composemediaplayer.jsinterop.AudioContext
+import io.github.kdroidfilter.composemediaplayer.jsinterop.ChannelSplitterNode
+import io.github.kdroidfilter.composemediaplayer.jsinterop.MediaElementAudioSourceNode
 import org.khronos.webgl.Uint8Array
 import org.khronos.webgl.get
 import org.w3c.dom.HTMLVideoElement
 
-class VideoAudioAnalyzer(private val video: HTMLVideoElement) {
+internal class AudioLevelProcessor(private val video: HTMLVideoElement) {
 
     private var audioContext: AudioContext? = null
     private var sourceNode: MediaElementAudioSourceNode? = null

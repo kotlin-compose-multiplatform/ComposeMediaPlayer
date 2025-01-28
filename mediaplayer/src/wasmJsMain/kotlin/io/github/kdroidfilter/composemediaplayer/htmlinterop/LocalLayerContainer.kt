@@ -7,7 +7,7 @@
  * Modifications may have been made by kdroidFilter.
  */
 
-package io.github.kdroidfilter.composemediaplayer
+package io.github.kdroidfilter.composemediaplayer.htmlinterop
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import org.w3c.dom.Element

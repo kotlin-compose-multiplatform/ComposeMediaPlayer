@@ -8,6 +8,7 @@ import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
+import io.github.kdroidfilter.composemediaplayer.util.logger
 import javafx.application.Platform
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
@@ -98,7 +99,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
 
                 // Créer le nouveau MediaPlayer
                 val fileOrUrl = if (uri.startsWith("http")) uri else File(uri).toURI().toString()
-                println("Opening media: $fileOrUrl")
+                logger.debug { "Opening media: $fileOrUrl" }
 
                 val media = Media(fileOrUrl)
                 MediaPlayer(media).also { player ->
@@ -244,7 +245,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
 
     private fun setupStatusListener(player: MediaPlayer) {
         player.statusProperty().addListener { _, _, newStatus ->
-            println("Player status: $newStatus")
+            logger.debug { "Player status: $newStatus" }
             when (newStatus) {
                 MediaPlayer.Status.PLAYING -> {
                     _isPlaying = true
@@ -283,7 +284,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
 
     private fun setupEventHandlers(player: MediaPlayer) {
         player.setOnReady {
-            println("Player ready")
+            logger.debug { "Player ready" }
             _duration = player.totalDuration?.toSeconds() ?: 0.0
             _isLoading = false
 
@@ -328,7 +329,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
                 // Finally clear the reference
                 mediaPlayer = null
                 resetStates()
-                println("Media stopped successfully")
+                logger.debug { "Media stopped successfully" }
             } catch (e: Exception) {
                 handleError("Error stopping media", e)
             }
@@ -366,7 +367,7 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     }
 
     private fun handleError(message: String, error: Throwable?) {
-        println("$message: ${error?.message}")
+        logger.debug { "$message: ${error?.message}" }
         error?.printStackTrace()
         _isPlaying = false
         _isLoading = false

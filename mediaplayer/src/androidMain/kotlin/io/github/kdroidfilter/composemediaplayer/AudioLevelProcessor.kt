@@ -33,40 +33,40 @@ class AudioLevelProcessor : BaseAudioProcessor() {
         var rightSum = 0.0
         var sampleCount = 0
 
-        // Copier le buffer pour ne pas affecter la position originale
+        // Copy the buffer so as not to affect the original position
         val buffer = inputBuffer.duplicate()
 
         while (buffer.remaining() >= 2) {
-            // Lecture des échantillons 16-bit
+            // Reading 16-bit samples
             val sample = buffer.short / Short.MAX_VALUE.toFloat()
 
             if (channelCount >= 2) {
-                // Stéréo
+                // Stereo
                 if (sampleCount % 2 == 0) {
                     leftSum += abs(sample.toDouble())
                 } else {
                     rightSum += abs(sample.toDouble())
                 }
             } else {
-                // Mono - même valeur pour les deux canaux
+                // Mono - same value for both channels
                 leftSum += abs(sample.toDouble())
                 rightSum += abs(sample.toDouble())
             }
             sampleCount++
         }
 
-        // Calculer RMS et convertir en dB
+        // Calculate RMS and convert to dB
         val samplesPerChannel = if (channelCount >= 2) sampleCount / 2 else sampleCount
         val leftRms = if (samplesPerChannel > 0) sqrt(leftSum / samplesPerChannel) else 0.0
         val rightRms = if (samplesPerChannel > 0) sqrt(rightSum / samplesPerChannel) else 0.0
 
-        // Convertir en pourcentage (0-100)
+        // Convert to percentage (0-100)
         val leftLevel = convertToPercentage(leftRms)
         val rightLevel = convertToPercentage(rightRms)
 
         onAudioLevelUpdate?.invoke(leftLevel, rightLevel)
 
-        // Passer le buffer original tel quel
+        // Pass the original buffer as is
         val output = replaceOutputBuffer(inputBuffer.remaining())
         output.put(inputBuffer)
         output.flip()
@@ -75,7 +75,7 @@ class AudioLevelProcessor : BaseAudioProcessor() {
     private fun convertToPercentage(rms: Double): Float {
         if (rms <= 0) return 0f
         val db = 20 * log10(rms)
-        // Convertir de -60dB..0dB à 0..100%
+        // Convert from -60dB..0dB to 0..100%
         return ((db + 60) / 60 * 100).toFloat().coerceIn(0f, 100f)
     }
 

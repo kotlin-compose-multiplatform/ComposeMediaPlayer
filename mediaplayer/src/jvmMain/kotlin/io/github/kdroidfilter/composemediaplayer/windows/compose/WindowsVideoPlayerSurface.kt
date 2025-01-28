@@ -12,7 +12,7 @@ import javax.swing.SwingUtilities
 
 
 @Composable
-fun WindowsVideoPlayerSurface(
+internal fun WindowsVideoPlayerSurface(
     playerState: WindowsVideoPlayerState,
     modifier: Modifier = Modifier
 ) {

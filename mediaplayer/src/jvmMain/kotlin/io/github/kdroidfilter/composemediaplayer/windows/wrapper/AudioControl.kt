@@ -7,7 +7,7 @@ import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 /**
  * Wrapper class for audio control functions
  */
-class AudioControl(private val mediaPlayerLib: MediaPlayerLib) {
+class AudioControl internal constructor(private val mediaPlayerLib: MediaPlayerLib) {
     /**
      * Sets the volume level (0.0 to 1.0)
      * @param level Volume level between 0.0 (silence) and 1.0 (full volume)

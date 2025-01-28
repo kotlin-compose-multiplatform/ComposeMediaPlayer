@@ -3,9 +3,10 @@ package io.github.kdroidfilter.composemediaplayer.windows.swing
 import com.sun.jna.Native
 import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
+import io.github.kdroidfilter.composemediaplayer.util.logger
 import io.github.kdroidfilter.composemediaplayer.windows.MediaPlayerLib
 import io.github.kdroidfilter.composemediaplayer.windows.ui.VideoCanvas
-import io.github.kdroidfilter.composemediaplayer.windows.util.Logger
 import io.github.kdroidfilter.composemediaplayer.windows.wrapper.AudioControl
 import io.github.kdroidfilter.composemediaplayer.windows.wrapper.MediaPlayerSlider
 import java.awt.*
@@ -19,8 +20,7 @@ import javax.swing.Timer
 import javax.swing.filechooser.FileNameExtensionFilter
 import kotlin.system.exitProcess
 
-class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
-    private val logger = Logger("VideoPlayer")
+internal class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     private var isPaused = false
     private var renderTimer: Timer? = null
     private var progressTimer: Timer? = null
@@ -69,7 +69,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             startRenderTimer()
             startProgressTimer()
         } catch (e: Exception) {
-            logger.error("Initialization error", e)
+            logger.error(e) { "Initialization error" }
             showError("Initialization error", -1)
             exitProcess(1)
         }
@@ -199,12 +199,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         )
     }
 
-    private fun formatTime(seconds: Double): String {
-        val hours = (seconds / 3600).toInt()
-        val minutes = ((seconds % 3600) / 60).toInt()
-        val secs = (seconds % 60).toInt()
-        return String.format("%02d:%02d:%02d", hours, minutes, secs)
-    }
+
 
     private fun initializeAudioControls() {
         audioControl.getVolume()?.let { volume ->
@@ -220,7 +215,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             if (!volumeSlider.valueIsAdjusting) {
                 val volumeValue = volumeSlider.value / 100f
                 audioControl.setVolume(volumeValue)
-                logger.log("Volume changed to: ${volumeSlider.value}%")
+                logger.debug {  "Volume changed to: ${volumeSlider.value}%" }
             }
         }
 
@@ -237,13 +232,13 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             }
         }
         renderTimer?.start()
-        logger.log("Render timer started (30 FPS)")
+        logger.debug { "Render timer started (30 FPS)" }
     }
 
     private fun createMediaCallback(): MediaPlayerLib.MediaPlayerCallback {
         return MediaPlayerLib.MediaPlayerCallback { eventType, hr ->
             SwingUtilities.invokeLater {
-                logger.log("Media Event: ${eventTypeToString(eventType)} (0x${hr.toString(16)})")
+                logger.debug { "Media Event: ${eventTypeToString(eventType)} (0x${hr.toString(16)})" }
                 when (eventType) {
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_CREATED -> handleMediaItemCreated(hr)
                     MediaPlayerLib.MP_EVENT_MEDIAITEM_SET -> handleMediaItemSet(hr)
@@ -269,7 +264,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
             try {
                 Thread.sleep(200)
                 val hwnd = Native.getComponentPointer(videoCanvas)
-                logger.log("Initializing Media Player with HWND: $hwnd")
+                logger.debug { "Initializing Media Player with HWND: $hwnd" }
 
                 if (hwnd == null) {
                     throw RuntimeException("Unable to retrieve the Canvas HWND")
@@ -280,9 +275,9 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                     throw RuntimeException("Media player initialization failed: 0x${result.toString(16)}")
                 }
 
-                logger.log("Media Player successfully initialized")
+                logger.debug { "Media Player successfully initialized" }
             } catch (e: Exception) {
-                logger.error("Failed to initialize the media player", e)
+                logger.error(e) { "Failed to initialize the media player" }
                 showError("Initialization error", -1)
                 exitProcess(1)
             }
@@ -337,30 +332,30 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         dialog.pack()
         dialog.setLocationRelativeTo(this)
         dialog.isResizable = false
-        dialog.defaultCloseOperation = JDialog.DISPOSE_ON_CLOSE
+        dialog.defaultCloseOperation = DISPOSE_ON_CLOSE
         dialog.isVisible = true
     }
 
     private fun playUrl(url: String) {
         if (!MediaPlayerLib.INSTANCE.IsInitialized()) {
-            logger.error("The media player is not initialized.")
+            error { "The media player is not initialized." }
             return
         }
 
         try {
-            logger.log("Attempting to play URL: $url")
+            logger.debug { "Attempting to play URL: $url" }
             val result = MediaPlayerLib.INSTANCE.PlayURL(WString(url))
             if (!checkHResult(result)) {
-                logger.error("Failed to play URL: 0x${result.toString(16)}")
+                error { "Failed to play URL: 0x${result.toString(16)}" }
                 showError("Error opening URL", result)
             } else {
-                logger.log("PlayURL successfully called.")
+                logger.debug { "PlayURL successfully called." }
                 playPauseButton.isEnabled = true
                 stopButton.isEnabled = true
                 progressSlider.value = 0
             }
         } catch (e: Exception) {
-            logger.error("Error playing URL", e)
+            logger.error(e) { "Error playing URL" }
             showError("Error playing URL", -1)
         }
     }
@@ -382,31 +377,31 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
 
     private fun playFile(filePath: String) {
         if (!MediaPlayerLib.INSTANCE.IsInitialized()) {
-            logger.error("The media player is not initialized.")
+            error { "The media player is not initialized." }
             return
         }
 
         val file = File(filePath)
         if (!file.exists()) {
-            logger.error("File does not exist: $filePath")
+            error { "File does not exist: $filePath" }
             showError("File does not exist", -1)
             return
         }
 
         val extension = file.extension.lowercase(Locale.getDefault())
         if (extension !in setOf("mp4", "avi", "wmv", "mkv", "mov")) {
-            logger.error("Unsupported file format: $extension")
+            error { "Unsupported file format: $extension" }
             showError("Unsupported file format", -1)
             return
         }
 
-        logger.log("Attempting to play file: $filePath")
+        logger.debug { "Attempting to play file: $filePath" }
         val result = MediaPlayerLib.INSTANCE.PlayFile(WString(file.absolutePath))
         if (!checkHResult(result)) {
-            logger.error("Failed to play file: 0x${result.toString(16)}")
+            error { "Failed to play file: 0x${result.toString(16)}" }
             showError("Error opening file", result)
         } else {
-            logger.log("PlayFile successfully called.")
+            logger.debug { "PlayFile successfully called." }
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
             progressSlider.value = 0
@@ -421,7 +416,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         }
 
         if (checkHResult(result)) {
-            logger.log("Requested state change to: ${if (isPaused) "Playing" else "Paused"}")
+            logger.debug { "Requested state change to: ${if (isPaused) "Playing" else "Paused"}" }
         }
     }
 
@@ -436,7 +431,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
         isMuted = !isMuted
         if (audioControl.setMute(isMuted)) {
             updateMuteButton()
-            logger.log("Mute toggled: $isMuted")
+            logger.debug { "Mute toggled: $isMuted" }
         }
     }
 
@@ -473,11 +468,11 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handleMediaItemCreated(hr: Int) {
-        logger.log("handleMediaItemCreated, HR: 0x${hr.toString(16)}")
+        logger.debug { "handleMediaItemCreated, HR: 0x${hr.toString(16)}" }
     }
 
     private fun handleMediaItemSet(hr: Int) {
-        logger.log("handleMediaItemSet, HR: 0x${hr.toString(16)}")
+        logger.debug { "handleMediaItemSet, HR: 0x${hr.toString(16)}" }
         if (checkHResult(hr)) {
             playPauseButton.isEnabled = true
             stopButton.isEnabled = true
@@ -487,7 +482,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackStarted() {
-        logger.log("Playback started")
+        logger.debug { "Playback started" }
         isPaused = false
         playPauseButton.text = "Pause"
         playPauseButton.isEnabled = true
@@ -495,7 +490,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackPaused() {
-        logger.log("Playback paused")
+        logger.debug { "Playback paused" }
         isPaused = true
         playPauseButton.text = "Play"
         playPauseButton.isEnabled = true
@@ -503,7 +498,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackStopped() {
-        logger.log("Playback stopped")
+        logger.debug { "Playback stopped" }
         isPaused = false
         playPauseButton.text = "Play"
         playPauseButton.isEnabled = false
@@ -513,7 +508,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun handlePlaybackError(hr: Int) {
-        logger.error("Playback error: 0x${hr.toString(16)}")
+        error { "Playback error: 0x${hr.toString(16)}" }
         showError("Playback error", hr)
         handlePlaybackStopped()
     }
@@ -526,7 +521,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
                 -2147024891 -> "Access denied"
                 else -> "Unknown error"
             }
-            logger.error("HRESULT Error: 0x${hr.toString(16)} - $errorMessage")
+            error { "HRESULT Error: 0x${hr.toString(16)} - $errorMessage" }
             return false
         }
         return true
@@ -558,7 +553,7 @@ class VideoPlayerWindow : JFrame("KDroidFilter Media Player") {
     }
 
     private fun cleanup() {
-        logger.log("Cleaning up resources...")
+        logger.debug { "Cleaning up resources..." }
         renderTimer?.stop()
         progressTimer?.stop()
         audioControl.setMute(false)

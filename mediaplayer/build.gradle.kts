@@ -59,7 +59,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             api(libs.filekit.core)
             implementation(libs.kotlinx.datetime)
-
+            implementation(libs.kotlin.logging)
         }
 
         commonTest.dependencies {
@@ -81,6 +81,7 @@ kotlin {
             implementation(libs.gst1.java.swing)
             implementation(libs.jna)
             implementation(libs.jna.platform)
+            implementation(libs.slf4j.simple)
 
             compileOnly("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
             compileOnly("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
@@ -93,9 +94,6 @@ kotlin {
 
         wasmJsMain.dependencies {
             implementation(libs.kotlinx.browser.wasm.js)
-//            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-wasm-js:1.10.1")
-//            implementation(npm("audio-context", "1.0.3"))
-
         }
 
     }
