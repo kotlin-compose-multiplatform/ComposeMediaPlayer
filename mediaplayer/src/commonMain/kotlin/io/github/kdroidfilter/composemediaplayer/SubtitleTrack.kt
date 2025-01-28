@@ -19,5 +19,6 @@ import androidx.compose.runtime.Stable
 data class SubtitleTrack(
     val id: String,
     val language: String,
-    val name: String
+    val name: String,
+    val src: String,
 )

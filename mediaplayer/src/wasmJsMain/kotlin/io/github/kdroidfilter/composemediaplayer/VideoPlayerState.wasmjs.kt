@@ -2,6 +2,7 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
@@ -35,11 +36,36 @@ actual open class VideoPlayerState {
 
     actual val metadata = VideoMetadata()
 
-    actual var subtitlesEnabled = false
-    actual var currentSubtitleTrack : SubtitleTrack? = null
-    actual val availableSubtitleTracks  = emptyList<SubtitleTrack>()
-    actual fun selectSubtitleTrack(track: SubtitleTrack?){}
-    actual fun disableSubtitles() {}
+    // Subtitles
+
+    actual var subtitlesEnabled by mutableStateOf(false)
+    actual var currentSubtitleTrack: SubtitleTrack? by mutableStateOf(null)
+
+    private val _availableSubtitleTracks = mutableStateListOf<SubtitleTrack>()
+    actual val availableSubtitleTracks: List<SubtitleTrack> get() = _availableSubtitleTracks
+
+
+    fun setSubtitleTracks(tracks: List<SubtitleTrack>) {
+        _availableSubtitleTracks.clear()
+        _availableSubtitleTracks.addAll(tracks)
+    }
+
+
+    actual fun selectSubtitleTrack(track: SubtitleTrack?) {
+        if (track == null) {
+            disableSubtitles()
+            return
+        }
+        subtitlesEnabled = true
+        currentSubtitleTrack = track
+    }
+
+    actual fun disableSubtitles() {
+        subtitlesEnabled = false
+        currentSubtitleTrack = null
+    }
+
+    // Audio
 
     actual var volume by mutableStateOf(1.0f)
     actual var sliderPos by mutableStateOf(0.0f)
