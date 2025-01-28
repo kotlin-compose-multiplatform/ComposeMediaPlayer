@@ -2,11 +2,13 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
+import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.sqrt
 
+@UnstableApi
 class AudioLevelProcessor : BaseAudioProcessor() {
     private var channelCount = 0
     private var sampleRateHz = 0
