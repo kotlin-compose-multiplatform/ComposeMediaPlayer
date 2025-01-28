@@ -35,6 +35,12 @@ actual open class VideoPlayerState {
 
     actual val metadata = VideoMetadata()
 
+    actual var subtitlesEnabled = false
+    actual var currentSubtitleTrack : SubtitleTrack? = null
+    actual val availableSubtitleTracks  = emptyList<SubtitleTrack>()
+    actual fun selectSubtitleTrack(track: SubtitleTrack?){}
+    actual fun disableSubtitles() {}
+
     actual var volume by mutableStateOf(1.0f)
     actual var sliderPos by mutableStateOf(0.0f)
     actual var userDragging by mutableStateOf(false)

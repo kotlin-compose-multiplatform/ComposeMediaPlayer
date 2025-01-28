@@ -42,6 +42,13 @@ interface PlatformVideoPlayerState {
 
     val metadata: VideoMetadata
 
+    // Subtitle management
+    var subtitlesEnabled: Boolean
+    var currentSubtitleTrack: SubtitleTrack?
+    val availableSubtitleTracks: List<SubtitleTrack>
+    fun selectSubtitleTrack(track: SubtitleTrack?)
+    fun disableSubtitles()
+
     fun openUri(uri: String)
     fun play()
     fun pause()

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
@@ -73,6 +74,22 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override val isLoading: Boolean get() = _isLoading
     override val error: VideoPlayerError? get() = _error
     override val metadata: VideoMetadata = VideoMetadata()
+    override var subtitlesEnabled: Boolean
+        get() = TODO("Not yet implemented")
+        set(value) {}
+    override var currentSubtitleTrack: SubtitleTrack?
+        get() = TODO("Not yet implemented")
+        set(value) {}
+    override val availableSubtitleTracks: List<SubtitleTrack>
+        get() = TODO("Not yet implemented")
+
+    override fun selectSubtitleTrack(track: SubtitleTrack?) {
+        TODO("Not yet implemented")
+    }
+
+    override fun disableSubtitles() {
+        TODO("Not yet implemented")
+    }
 
     // Main function to update the MediaView
     fun updateMediaView(view: MediaView) {

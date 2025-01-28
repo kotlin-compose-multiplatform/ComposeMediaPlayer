@@ -22,6 +22,12 @@ actual open class VideoPlayerState {
     private var _metadata = VideoMetadata()
     actual val metadata: VideoMetadata get() = _metadata
 
+    actual var subtitlesEnabled = false
+    actual var currentSubtitleTrack : SubtitleTrack? = null
+    actual val availableSubtitleTracks  = emptyList<SubtitleTrack>()
+    actual fun selectSubtitleTrack(track: SubtitleTrack?){}
+    actual fun disableSubtitles() {}
+
     actual fun openUri(uri: String) {
     }
 
