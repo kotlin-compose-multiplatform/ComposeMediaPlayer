@@ -16,7 +16,7 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
     var videoElement by remember { mutableStateOf<HTMLVideoElement?>(null) }
     val scope = rememberCoroutineScope()
 
-    // Create the HTML video element
+    // Create HTML video element
     HtmlView(
         factory = {
             createVideoElement()
@@ -28,7 +28,7 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
         }
     )
 
-    // Handle source URI effects
+    // Handle source change effect
     LaunchedEffect(playerState.sourceUri) {
         videoElement?.let {
             it.src = playerState.sourceUri ?: ""
@@ -40,7 +40,7 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
         }
     }
 
-    // Handle playback effects
+    // Handle play/pause
     LaunchedEffect(playerState.isPlaying) {
         videoElement?.let {
             if (playerState.isPlaying) {
@@ -51,30 +51,30 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
         }
     }
 
-    // Handle volume effects
+    // Handle volume update
     LaunchedEffect(playerState.volume) {
         videoElement?.volume = playerState.volume.toDouble()
     }
 
-    // Handle loop effects
+    // Handle loop update
     LaunchedEffect(playerState.loop) {
         videoElement?.loop = playerState.loop
     }
 
-    // Handle seek effects via sliderPos with debounce
+    // Handle seek via sliderPos (with debounce)
     LaunchedEffect(playerState.sliderPos) {
         if (!playerState.userDragging && playerState.hasMedia) {
             val job = scope.launch {
                 val duration = videoElement?.duration?.toFloat() ?: 0f
                 if (duration > 0f) {
                     val newTime = (playerState.sliderPos / VideoPlayerState.PERCENTAGE_MULTIPLIER) * duration
-                    // Avoid updating if the difference is too small
+                    // Avoid seeking if the difference is small
                     if (abs((videoElement?.currentTime ?: 0.0) - newTime) > 0.5) {
                         videoElement?.currentTime = newTime.toDouble()
                     }
                 }
             }
-            // Cancel the previous job if a new sliderPos is received before the delay
+            // Cancel previous job if a new sliderPos arrives before completion
             playerState.seekJob?.cancel()
             playerState.seekJob = job
         }
@@ -86,78 +86,106 @@ private fun createVideoElement(): HTMLVideoElement {
         controls = false
         style.width = "100%"
         style.height = "100%"
+        crossOrigin = "anonymous"
     }
 }
 
-private fun setupVideoElement(
+/**
+ * Configure video element: listeners, WebAudioAnalyzer, etc.
+ */
+fun setupVideoElement(
     video: HTMLVideoElement,
     playerState: VideoPlayerState,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    enableAudioDetection: Boolean = true
 ) {
-    // Clean up old listeners
+    println("Setup video => enableAudioDetection = $enableAudioDetection")
+
+    // Create analyzer only if enableAudioDetection is true
+    val audioAnalyzer = if (enableAudioDetection) {
+        VideoAudioAnalyzer(video)
+    } else null
+
+    var initializationJob: Job? = null
+
+    // Helper => initialize analysis if enableAudioDetection
+    fun initAudioAnalyzer() {
+        if (!enableAudioDetection) return
+        initializationJob?.cancel()
+        initializationJob = scope.launch {
+            audioAnalyzer?.initialize()
+        }
+    }
+
+    // loadedmetadata => attempt initialization
+    video.addEventListener("loadedmetadata") {
+        println("Video => loadedmetadata => init analyzer if enabled")
+        initAudioAnalyzer()
+    }
+
+    // play => re-init
+    video.addEventListener("play") {
+        println("Video => play => init analyzer if needed")
+
+        if (!enableAudioDetection) {
+            println("Audio detection disabled => no analyzer.")
+        } else if (initializationJob?.isActive != true) {
+            initAudioAnalyzer()
+        }
+
+        // Loop => read levels only if analyzer is not null
+        if (enableAudioDetection) {
+            scope.launch {
+                println("Starting audio level update loop")
+                while (true) {
+                    val (left, right) = audioAnalyzer?.getAudioLevels() ?: (0f to 0f)
+                    playerState.updateAudioLevels(left, right)
+                    delay(100)
+                }
+            }
+        }
+    }
+
+    // timeupdate
     video.removeEventListener("timeupdate", playerState::onTimeUpdateEvent)
     video.addEventListener("timeupdate", playerState::onTimeUpdateEvent)
 
-    // Event triggered when the video starts a seek operation
-    video.addEventListener("seeking", {
+    // seeking, waiting, canplay, etc.
+    video.addEventListener("seeking") {
+        scope.launch { playerState._isLoading = true }
+    }
+    video.addEventListener("seeked") {
+        scope.launch { playerState._isLoading = false }
+    }
+    video.addEventListener("waiting") {
+        scope.launch { playerState._isLoading = true }
+    }
+    video.addEventListener("playing") {
+        scope.launch { playerState._isLoading = false }
+    }
+    video.addEventListener("canplaythrough") {
+        scope.launch { playerState._isLoading = false }
+    }
+    video.addEventListener("canplay") {
+        scope.launch { playerState._isLoading = false }
+    }
+    video.addEventListener("suspend") {
         scope.launch {
-            playerState._isLoading = true
-        }
-    })
-
-    // Event triggered when the seek operation is complete
-    video.addEventListener("seeked", {
-        scope.launch {
-            playerState._isLoading = false
-        }
-    })
-
-    // Event triggered when the video is waiting for data (buffering)
-    video.addEventListener("waiting", {
-        scope.launch {
-            playerState._isLoading = true
-        }
-    })
-
-    // Event triggered when the video can start or resume playback
-    video.addEventListener("playing", {
-        scope.launch {
-            playerState._isLoading = false
-        }
-    })
-
-    // Event triggered when the video can play through without interruption
-    video.addEventListener("canplaythrough", {
-        scope.launch {
-            playerState._isLoading = false
-        }
-    })
-
-    // Event for "can play" state
-    video.addEventListener("canplay", {
-        scope.launch {
-            playerState._isLoading = false
-        }
-    })
-
-    video.addEventListener("suspend", {
-        scope.launch {
-            // Only set isLoading to false if we have enough data to play
-            if (video.readyState >= 3) { // HAVE_FUTURE_DATA or better
+            if (video.readyState >= 3) {
                 playerState._isLoading = false
             }
         }
-    })
-
-    // Listener for playback errors
-    video.addEventListener("error", {
+    }
+    // error
+    video.addEventListener("error") {
         scope.launch {
             playerState._isLoading = false
+            println("Video => error => possibly no audio analyzer if CORS issues.")
         }
-    })
+    }
 
-    // Listener for metadata
-    video.addEventListener("loadedmetadata", {
+    // loadedmetadata => set isLoading false + play if needed
+    video.addEventListener("loadedmetadata") {
         scope.launch {
             playerState._isLoading = false
             if (playerState.isPlaying) {
@@ -168,13 +196,13 @@ private fun setupVideoElement(
                 }
             }
         }
-    })
+    }
 
-    // Apply volume, loop, etc.
+    // volume, loop
     video.volume = playerState.volume.toDouble()
     video.loop = playerState.loop
 
-    // Play if the source is set and state allows
+    // If source already exists + want to play
     if (video.src.isNotEmpty() && playerState.isPlaying) {
         try {
             video.play()
@@ -184,7 +212,7 @@ private fun setupVideoElement(
     }
 }
 
-// Add an extension to handle the "timeupdate" event
+// Handle "timeupdate" event to manage progress cursor
 private fun VideoPlayerState.onTimeUpdateEvent(event: Event) {
     val video = event.target as? HTMLVideoElement
     video?.let {

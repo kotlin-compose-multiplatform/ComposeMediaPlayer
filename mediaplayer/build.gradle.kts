@@ -84,8 +84,8 @@ kotlin {
 
         wasmJsMain.dependencies {
             implementation(libs.kotlinx.browser.wasm.js)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-wasm-js:1.10.1")
-            implementation(npm("audio-context", "1.0.3"))
+//            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-wasm-js:1.10.1")
+//            implementation(npm("audio-context", "1.0.3"))
 
         }
 
