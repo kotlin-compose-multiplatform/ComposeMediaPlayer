@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import com.vanniktech.maven.publish.SonatypeHost
+import org.gradle.kotlin.dsl.withType
+import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import java.util.*
 
@@ -10,6 +12,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.compose)
     alias(libs.plugins.vannitktech.maven.publish)
+    alias(libs.plugins.dokka)
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
@@ -28,6 +31,12 @@ val fxClassifier = when {
 }
 
 val javafxVersion = "22.0.1"
+
+tasks.withType<DokkaTask>().configureEach {
+    moduleName.set("Compose Media Player")
+    offlineMode.set(true)
+}
+
 
 kotlin {
     jvmToolchain(17)
