@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import io.github.vinceglb.filekit.PlatformFile
@@ -51,7 +52,7 @@ fun App() {
                     .padding(16.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    // En-tête
+                    // Header
                     Text(
                         "Compose Media Player",
                         style = MaterialTheme.typography.headlineMedium,
@@ -60,14 +61,14 @@ fun App() {
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
-                    Box{
+                    Box {
                         if(playerState.isLoading){
                             CircularProgressIndicator()
                         }
                     }
                 }
 
-                // Zone vidéo
+                // Video Area
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -123,7 +124,7 @@ fun App() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Contrôles principaux
+                // Main Controls
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -164,10 +165,9 @@ fun App() {
                     }
                 }
 
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Carte des contrôles secondaires
+                // Secondary Controls Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -237,6 +237,11 @@ fun App() {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        // Subtitle Selection Menu
+                        SubtitleSelectionMenu(playerState = playerState)
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         OutlinedTextField(
                             value = url,
                             onValueChange = { url = it },
@@ -268,7 +273,7 @@ fun App() {
                 }
             }
 
-            // Snackbar d'erreur repositionné
+            // Repositioned Error Snackbar
             playerState.error?.let { error ->
                 AnimatedVisibility(
                     visible = true,
@@ -309,4 +314,62 @@ fun App() {
     }
 }
 
-expect fun PlatformFile.getUri(): String
+/**
+ * Context menu for subtitle selection/activation.
+ */
+@Composable
+fun SubtitleSelectionMenu(playerState: VideoPlayerState) {
+    // Local state for menu open/close
+    var expanded by remember { mutableStateOf(false) }
+
+    // Text displayed on the button. Display the active track name,
+    // or "Disabled" if no subtitle is selected.
+    val currentSubtitleLabel = playerState.currentSubtitleTrack?.name ?: "Disabled"
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Subtitles: ",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+
+        Box {
+            // Button to open/close the menu
+            OutlinedButton(onClick = { expanded = !expanded }) {
+                Text(
+                    currentSubtitleLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Menu listing the different tracks + "Disabled" option
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                // Option: Disabled
+                DropdownMenuItem(
+                    text = { Text("Disabled") },
+                    onClick = {
+                        expanded = false
+                        playerState.disableSubtitles()
+                    }
+                )
+
+                // Create a menu item for each available track
+                playerState.availableSubtitleTracks.forEach { track ->
+                    DropdownMenuItem(
+                        text = { Text(track.name) },
+                        onClick = {
+                            expanded = false
+                            playerState.selectSubtitleTrack(track)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
