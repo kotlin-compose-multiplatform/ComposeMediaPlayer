@@ -31,15 +31,25 @@ import javax.swing.Timer
 import kotlin.math.pow
 
 /**
- * LinuxVideoPlayerState class serves as the platform-specific implementation of a video player state
- * for Linux systems using GStreamer. It provides video playback functionality, including control over
- * playback state, volume, looping, and timeline navigation.
+ * LinuxVideoPlayerState serves as a Linux-specific implementation of a
+ * video player state, utilizing GStreamer.
  *
- * @author kdroidFilter
- * @since 2025-01-20
+ * In this version, to dynamically change the subtitle source, the pipeline
+ * is reset to READY and then PLAYING, and a Timer triggers a seek with
+ * a slight delay to resume playback exactly at the saved position.
+ *
+ * For local subtitles, the path is converted into a file URI.
+ *
+ * Note: This approach may cause a slight glitch when changing subtitles.
+ *
  */
 @Stable
 class LinuxVideoPlayerState : PlatformVideoPlayerState {
+
+    companion object {
+        // Flag to enable text subtitles (GST_PLAY_FLAG_TEXT)
+        const val GST_PLAY_FLAG_TEXT = 1 shl 2
+    }
 
     init {
         GStreamerInit.init()
@@ -49,26 +59,32 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     val gstVideoComponent = GstVideoComponent()
     private val sliderTimer = Timer(50, null)
 
-    // region: State declarations
+    // region: State Declarations
     private var bufferingPercent by mutableStateOf(100)
     private var isUserPaused by mutableStateOf(false)
 
     private var _sliderPos by mutableStateOf(0f)
     override var sliderPos: Float
         get() = _sliderPos
-        set(value) { _sliderPos = value }
+        set(value) {
+            _sliderPos = value
+        }
 
     private var targetSeekPos: Float = 0f
 
     private var _userDragging by mutableStateOf(false)
     override var userDragging: Boolean
         get() = _userDragging
-        set(value) { _userDragging = value }
+        set(value) {
+            _userDragging = value
+        }
 
     private var _loop by mutableStateOf(false)
     override var loop: Boolean
         get() = _loop
-        set(value) { _loop = value }
+        set(value) {
+            _loop = value
+        }
 
     private var _volume by mutableStateOf(1f)
     override var volume: Float
@@ -99,15 +115,18 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         get() = _isLoading
 
     private var _hasMedia by mutableStateOf(false)
-
     override val hasMedia: Boolean
         get() = _hasMedia
 
-    override fun showMedia() { _hasMedia = true }
-    override fun hideMedia() { _hasMedia = false }
+    override fun showMedia() {
+        _hasMedia = true
+    }
+
+    override fun hideMedia() {
+        _hasMedia = false
+    }
 
     private var _isPlaying by mutableStateOf(false)
-
     override val isPlaying: Boolean
         get() = _isPlaying
 
@@ -118,17 +137,103 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override var subtitlesEnabled: Boolean = false
     override var currentSubtitleTrack: SubtitleTrack? = null
     override val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
-
-
-    override fun selectSubtitleTrack(track: SubtitleTrack?) {
-       // TODO("Not yet implemented")
-    }
-
-    override fun disableSubtitles() {
-     //   TODO("Not yet implemented")
-    }
-
     // endregion
+
+    /**
+     * Selects the subtitle track to use.
+     *
+     * To change subtitles on the fly, if the video is playing, we save the
+     * current position, force the pipeline to READY state, update the source
+     * and the flag, then switch back to PLAYING. A Timer then triggers a seek
+     * to the saved position.
+     *
+     * For local subtitles, the path is converted to a file URI.
+     */
+    override fun selectSubtitleTrack(track: SubtitleTrack?) {
+        currentSubtitleTrack = track
+        try {
+            if (track != null) {
+                val suburi = if (track.src.toString().startsWith("http://") ||
+                    track.src.toString().startsWith("https://")
+                ) {
+                    track.src.toString()
+                } else {
+                    File(track.src.toString()).toURI().toString()
+                }
+                if (isPlaying) {
+                    val pos = playbin.queryPosition(Format.TIME)
+                    // Force a complete pipeline reconfiguration
+                    playbin.state = READY
+                    playbin.set("suburi", suburi)
+                    val currentFlags = playbin.get("flags") as Int
+                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
+                    playbin.state = PLAYING
+                    // Use a Timer to delay the seek and resume at the correct position
+                    Timer(100) { _ ->
+                        playbin.seekSimple(
+                            Format.TIME,
+                            EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
+                            pos
+                        )
+                    }.apply {
+                        isRepeats = false
+                        start()
+                    }
+                } else {
+                    playbin.set("suburi", suburi)
+                    val currentFlags = playbin.get("flags") as Int
+                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
+                }
+                subtitlesEnabled = true
+            } else {
+                disableSubtitles()
+            }
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Error selecting subtitles: ${e.message}")
+        }
+    }
+
+    /**
+     * Selects the subtitle track to use.
+     *
+     * To dynamically change subtitles, if the video is playing, we save the
+     * current position, force the pipeline to READY state, update the source
+     * and flag, and then resume PLAYING. A Timer then triggers a seek to
+     * resume playback at the saved position.
+     *
+     * For local subtitles, the path is converted into a file URI.
+     */
+    override fun disableSubtitles() {
+        currentSubtitleTrack = null
+        try {
+            if (isPlaying) {
+                val pos = playbin.queryPosition(Format.TIME)
+                playbin.state = READY
+                playbin.set("suburi", "")
+                val currentFlags = playbin.get("flags") as Int
+                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
+                playbin.state = PLAYING
+                Timer(100) { _ ->
+                    playbin.seekSimple(
+                        Format.TIME,
+                        EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
+                        pos
+                    )
+                }.apply {
+                    isRepeats = false
+                    start()
+                }
+            } else {
+                playbin.set("suburi", "")
+                val currentFlags = playbin.get("flags") as Int
+                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
+            }
+            subtitlesEnabled = false
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Error disabling subtitles : ${e.message}")
+        }
+    }
+
     private var lastAspectRatioUpdateTime: Long = 0
     private val ASPECT_RATIO_DEBOUNCE_MS = 500
     private var _aspectRatio by mutableStateOf(DEFAULT_ASPECT_RATIO)
@@ -136,12 +241,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         get() = _aspectRatio
 
     init {
-        // GStreamer configuration
+        // GStreamer Configuration
         val levelElement = ElementFactory.make("level", "level")
         playbin.set("audio-filter", levelElement)
         playbin.setVideoSink(gstVideoComponent.element)
 
-        // Bus event handlers
+        // Bus Event Management
         playbin.bus.connect(object : Bus.EOS {
             override fun endOfStream(source: GstObject) {
                 EventQueue.invokeLater {
@@ -150,7 +255,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                     } else {
                         stop()
                     }
-                    _isPlaying = loop // Updates the state based on loop mode
+                    _isPlaying = loop // Updates state based on loop mode
                 }
             }
         })
@@ -161,12 +266,15 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                     _error = when {
                         message.contains("codec") || message.contains("decode") ->
                             VideoPlayerError.CodecError(message)
+
                         message.contains("network") || message.contains("connection") ||
                                 message.contains("DNS") || message.contains("http") ->
                             VideoPlayerError.NetworkError(message)
+
                         message.contains("source") || message.contains("uri") ||
                                 message.contains("resource") ->
                             VideoPlayerError.SourceError(message)
+
                         else ->
                             VideoPlayerError.UnknownError(message)
                     }
@@ -185,10 +293,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         })
 
         playbin.bus.connect(object : Bus.STATE_CHANGED {
-            override fun stateChanged(source: GstObject,
-                                      old: org.freedesktop.gstreamer.State,
-                                      current: org.freedesktop.gstreamer.State,
-                                      pending: org.freedesktop.gstreamer.State) {
+            override fun stateChanged(
+                source: GstObject,
+                old: org.freedesktop.gstreamer.State,
+                current: org.freedesktop.gstreamer.State,
+                pending: org.freedesktop.gstreamer.State,
+            ) {
                 EventQueue.invokeLater {
                     when (current) {
                         PLAYING -> {
@@ -197,15 +307,17 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                             updateLoadingState()
                             updateAspectRatio()
                         }
+
                         PAUSED -> {
                             _isPlaying = false
                             updateLoadingState()
                         }
+
                         READY -> {
                             _isPlaying = false
                             updateLoadingState()
-
                         }
+
                         else -> {
                             _isPlaying = false
                             updateLoadingState()
@@ -215,16 +327,16 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         })
 
-        // Handle TAG messages for metadata
+        // TAG management for metadata
         playbin.bus.connect(object : Bus.TAG {
             override fun tagsFound(source: GstObject?, tagList: TagList?) {
                 EventQueue.invokeLater {
-                    //TODO Implement metadata extraction
+                    // TODO: Implémenter l'extraction des métadonnées
                 }
             }
         })
 
-        // Audio level monitoring
+        // Monitoring audio levels
         playbin.bus.connect("element") { _, message ->
             if (message.source == levelElement) {
                 val struct = message.structure
@@ -283,7 +395,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private fun updateAspectRatio() {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastAspectRatioUpdateTime < ASPECT_RATIO_DEBOUNCE_MS) {
-            return // Skip update if called too soon
+            return // Update ignored if too recent
         }
         lastAspectRatioUpdateTime = currentTime
 
@@ -299,7 +411,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
                 if (width > 0 && height > 0) {
                     val calculatedRatio = width.toFloat() / height.toFloat()
-                    if (calculatedRatio != _aspectRatio) { // Only update if changed
+                    if (calculatedRatio != _aspectRatio) { // Mise à jour uniquement si la valeur change
                         EventQueue.invokeLater {
                             _aspectRatio = if (calculatedRatio > 0) calculatedRatio else 16f / 9f
                             println("Aspect ratio updated to: $_aspectRatio")
@@ -318,13 +430,12 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         _isLoading = when {
             bufferingPercent < 100 -> true  // Still buffering
             isUserPaused -> false           // User paused, not loading
-            else -> false                   // Not buffering and not user paused
+            else -> false                   // No buffering or pausing
         }
     }
 
-
     override fun openUri(uri: String) {
-        stop() // This will also set _isPlaying to false
+        stop() // Stop playback and set _isPlaying back to false
         clearError()
         _isLoading = true
         _hasMedia = false
@@ -337,7 +448,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
             playbin.setURI(uriObj)
             _hasMedia = true
-            play() // This will set _isPlaying to true if successful
+            play() // Starts playback, which sets _isPlaying to true if successful
         } catch (e: Exception) {
             _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
             _isLoading = false
@@ -356,7 +467,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             isUserPaused = false
             updateLoadingState()
         } catch (e: Exception) {
-            _error = VideoPlayerError.UnknownError("Failed to play: ${e.message}")
+            _error = VideoPlayerError.UnknownError("Playback failed: ${e.message}")
             _isPlaying = false
         }
     }
@@ -368,7 +479,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             isUserPaused = true
             updateLoadingState()
         } catch (e: Exception) {
-            _error = VideoPlayerError.UnknownError("Failed to pause: ${e.message}")
+            _error = VideoPlayerError.UnknownError("Pause failed: ${e.message}")
         }
     }
 
