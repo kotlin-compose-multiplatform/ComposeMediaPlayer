@@ -74,7 +74,6 @@ fun App() {
             }
         }
 
-
         // State to show/hide the subtitle management dialog
         var showSubtitleDialog by remember { mutableStateOf(false) }
 
