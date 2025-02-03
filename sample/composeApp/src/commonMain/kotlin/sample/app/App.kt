@@ -74,17 +74,6 @@ fun App() {
             }
         }
 
-        // Initially add a default subtitle track via URL
-        LaunchedEffect(Unit) {
-            val defaultTrack = SubtitleTrack(
-                label = "Default Subtitles",
-                language = "en",
-                src = "https://gist.githubusercontent.com/samdutton/ca37f3adaf4e23679957b8083e061177/raw/e19399fbccbc069a2af4266e5120ae6bad62699a/sample.vtt"
-            )
-            subtitleTracks.add(defaultTrack)
-            selectedSubtitleTrack = defaultTrack
-            playerState.selectSubtitleTrack(defaultTrack)
-        }
 
         // State to show/hide the subtitle management dialog
         var showSubtitleDialog by remember { mutableStateOf(false) }
