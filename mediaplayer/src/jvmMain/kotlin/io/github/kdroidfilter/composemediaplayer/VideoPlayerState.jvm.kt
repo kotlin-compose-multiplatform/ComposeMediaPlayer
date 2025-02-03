@@ -91,4 +91,6 @@ actual open class VideoPlayerState {
     actual open fun seekTo(value: Float) = delegate.seekTo(value)
     actual open fun dispose() = delegate.dispose()
     actual open fun clearError() = delegate.clearError()
+    actual open fun hideMedia() { delegate.hideMedia() }
+    actual open fun showMedia() { delegate.showMedia()}
 }

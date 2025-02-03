@@ -65,6 +65,9 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override val hasMedia: Boolean
         get() = _hasMedia
 
+    override fun showMedia() { _hasMedia = true }
+    override fun hideMedia() { _hasMedia = false }
+
     // Public getters
     override val isPlaying: Boolean get() = _isPlaying
     override val leftLevel: Float get() = _leftLevel
@@ -80,8 +83,8 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override var currentSubtitleTrack: SubtitleTrack?
         get() = TODO("Not yet implemented")
         set(value) {}
-    override val availableSubtitleTracks: List<SubtitleTrack>
-        get() = TODO("Not yet implemented")
+    override  val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
+
 
     override fun selectSubtitleTrack(track: SubtitleTrack?) {
         TODO("Not yet implemented")

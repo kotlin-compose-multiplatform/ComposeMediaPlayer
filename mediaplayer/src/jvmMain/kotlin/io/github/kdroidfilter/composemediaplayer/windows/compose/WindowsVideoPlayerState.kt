@@ -65,6 +65,9 @@ internal class WindowsVideoPlayerState : PlatformVideoPlayerState {
         get() = _isPlaying
 
 
+    override fun showMedia() { _hasMedia = true }
+    override fun hideMedia() { _hasMedia = false }
+
     private var _volume by mutableStateOf(1f)
     override var volume: Float
         get() = _volume
@@ -126,8 +129,7 @@ internal class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override var currentSubtitleTrack: SubtitleTrack?
         get() = TODO("Not yet implemented")
         set(value) {}
-    override val availableSubtitleTracks: List<SubtitleTrack>
-        get() = TODO("Not yet implemented")
+    override val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
 
     override fun selectSubtitleTrack(track: SubtitleTrack?) {
         TODO("Not yet implemented")

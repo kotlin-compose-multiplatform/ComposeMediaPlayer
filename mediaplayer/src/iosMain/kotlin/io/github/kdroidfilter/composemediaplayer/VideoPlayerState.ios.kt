@@ -24,7 +24,7 @@ actual open class VideoPlayerState {
 
     actual var subtitlesEnabled = false
     actual var currentSubtitleTrack : SubtitleTrack? = null
-    actual val availableSubtitleTracks  = emptyList<SubtitleTrack>()
+    actual val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
     actual fun selectSubtitleTrack(track: SubtitleTrack?){}
     actual fun disableSubtitles() {}
 
@@ -45,6 +45,10 @@ actual open class VideoPlayerState {
 
     actual fun seekTo(value: Float) {
     }
+
+    actual fun hideMedia() {}
+
+    actual fun showMedia() {}
 
     actual fun dispose() {
     }

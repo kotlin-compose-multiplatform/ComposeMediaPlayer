@@ -45,7 +45,7 @@ interface PlatformVideoPlayerState {
     // Subtitle management
     var subtitlesEnabled: Boolean
     var currentSubtitleTrack: SubtitleTrack?
-    val availableSubtitleTracks: List<SubtitleTrack>
+    val availableSubtitleTracks: MutableList<SubtitleTrack>
     fun selectSubtitleTrack(track: SubtitleTrack?)
     fun disableSubtitles()
 
@@ -56,5 +56,7 @@ interface PlatformVideoPlayerState {
     fun seekTo(value: Float)
     fun dispose()
     fun clearError()
+    fun hideMedia()
+    fun showMedia()
 
 }

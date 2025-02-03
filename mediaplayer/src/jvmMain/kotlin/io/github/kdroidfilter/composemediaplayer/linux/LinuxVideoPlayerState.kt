@@ -103,6 +103,9 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val hasMedia: Boolean
         get() = _hasMedia
 
+    override fun showMedia() { _hasMedia = true }
+    override fun hideMedia() { _hasMedia = false }
+
     private var _isPlaying by mutableStateOf(false)
 
     override val isPlaying: Boolean
@@ -112,21 +115,17 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     override val error: VideoPlayerError?
         get() = _error
     override val metadata: VideoMetadata = VideoMetadata()
-    override var subtitlesEnabled: Boolean
-        get() = TODO("Not yet implemented")
-        set(value) {}
-    override var currentSubtitleTrack: SubtitleTrack?
-        get() = TODO("Not yet implemented")
-        set(value) {}
-    override val availableSubtitleTracks: List<SubtitleTrack>
-        get() = TODO("Not yet implemented")
+    override var subtitlesEnabled: Boolean = false
+    override var currentSubtitleTrack: SubtitleTrack? = null
+    override val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
+
 
     override fun selectSubtitleTrack(track: SubtitleTrack?) {
-        TODO("Not yet implemented")
+       // TODO("Not yet implemented")
     }
 
     override fun disableSubtitles() {
-        TODO("Not yet implemented")
+     //   TODO("Not yet implemented")
     }
 
     // endregion

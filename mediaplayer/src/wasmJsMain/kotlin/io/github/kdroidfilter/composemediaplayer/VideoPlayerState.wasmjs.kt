@@ -2,7 +2,6 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
@@ -16,6 +15,7 @@ import kotlin.time.TimeSource
 @Stable
 actual open class VideoPlayerState {
 
+
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var lastUpdateTime = TimeSource.Monotonic.markNow()
 
@@ -28,6 +28,14 @@ actual open class VideoPlayerState {
     private var _hasMedia by mutableStateOf(false)
     actual val hasMedia: Boolean get() = _hasMedia
 
+    actual fun hideMedia() {
+        _hasMedia = false
+    }
+
+    actual fun showMedia() {
+        _hasMedia = true
+    }
+
     internal var _isLoading by mutableStateOf(false)
     actual val isLoading: Boolean get() = _isLoading
 
@@ -36,36 +44,22 @@ actual open class VideoPlayerState {
 
     actual val metadata = VideoMetadata()
 
-    // Subtitles
-
-    actual var subtitlesEnabled by mutableStateOf(false)
-    actual var currentSubtitleTrack: SubtitleTrack? by mutableStateOf(null)
-
-    private val _availableSubtitleTracks = mutableStateListOf<SubtitleTrack>()
-    actual val availableSubtitleTracks: List<SubtitleTrack> get() = _availableSubtitleTracks
-
-
-    fun setSubtitleTracks(tracks: List<SubtitleTrack>) {
-        _availableSubtitleTracks.clear()
-        _availableSubtitleTracks.addAll(tracks)
-    }
-
+    actual var subtitlesEnabled = false
+    actual var currentSubtitleTrack: SubtitleTrack? = null
+    actual val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
 
     actual fun selectSubtitleTrack(track: SubtitleTrack?) {
-        if (track == null) {
-            disableSubtitles()
-            return
-        }
-        subtitlesEnabled = true
+        // Active les sous-titres et sélectionne la piste donnée
         currentSubtitleTrack = track
+        subtitlesEnabled = (track != null)
     }
+
 
     actual fun disableSubtitles() {
-        subtitlesEnabled = false
+        // Désactive les sous-titres
         currentSubtitleTrack = null
+        subtitlesEnabled = false
     }
-
-    // Audio
 
     actual var volume by mutableStateOf(1.0f)
     actual var sliderPos by mutableStateOf(0.0f)

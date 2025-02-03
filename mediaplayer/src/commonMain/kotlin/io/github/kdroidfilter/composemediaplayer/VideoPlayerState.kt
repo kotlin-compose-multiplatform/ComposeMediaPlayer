@@ -38,6 +38,8 @@ expect open class VideoPlayerState() {
     fun pause()
     fun stop()
     fun seekTo(value: Float)
+    fun hideMedia()
+    fun showMedia()
 
     // Functions to manage media sources
     fun openUri(uri: String)
@@ -53,7 +55,7 @@ expect open class VideoPlayerState() {
     // Subtitle management
     var subtitlesEnabled: Boolean
     var currentSubtitleTrack: SubtitleTrack?
-    val availableSubtitleTracks: List<SubtitleTrack>
+    val availableSubtitleTracks: MutableList<SubtitleTrack>
     fun selectSubtitleTrack(track: SubtitleTrack?)
     fun disableSubtitles()
 

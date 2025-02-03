@@ -54,7 +54,7 @@ actual open class VideoPlayerState {
 
     actual var subtitlesEnabled = false
     actual var currentSubtitleTrack : SubtitleTrack? = null
-    actual val availableSubtitleTracks  = emptyList<SubtitleTrack>()
+    actual val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
     actual fun selectSubtitleTrack(track: SubtitleTrack?){}
     actual fun disableSubtitles() {}
 
@@ -101,6 +101,10 @@ actual open class VideoPlayerState {
     private var _duration by mutableStateOf(0.0)
     actual val positionText: String get() = formatTime(_currentTime)
     actual val durationText: String get() = formatTime(_duration)
+
+
+    actual fun hideMedia() { _hasMedia = false }
+    actual fun showMedia() { _hasMedia = true }
 
     init {
         audioProcessor.setOnAudioLevelUpdateListener { left, right ->
@@ -195,6 +199,7 @@ actual open class VideoPlayerState {
                         }
                     }
                 }
+
                 delay(16) // ~60fps update rate
             }
         }
