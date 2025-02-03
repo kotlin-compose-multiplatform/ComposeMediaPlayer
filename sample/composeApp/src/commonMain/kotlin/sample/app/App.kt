@@ -7,39 +7,87 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
-import io.github.kdroidfilter.composemediaplayer.VideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
-import io.github.vinceglb.filekit.PlatformFile
+import io.github.kdroidfilter.composemediaplayer.util.getUri
 import io.github.vinceglb.filekit.dialog.PickerType
 import io.github.vinceglb.filekit.dialog.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.name
 
 @Composable
 fun App() {
     MaterialTheme {
-        var url by remember {
-            mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
-        }
+        // Default video URL
+        var videoUrl by remember { mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }
         val playerState = rememberVideoPlayerState()
 
-        val fileKitLauncher = rememberFilePickerLauncher(
+        // List of subtitle tracks and the currently selected track
+        val subtitleTracks = remember { mutableStateListOf<SubtitleTrack>() }
+        var selectedSubtitleTrack by remember { mutableStateOf<SubtitleTrack?>(null) }
+
+        // Launcher for selecting a local video file
+        val videoFileLauncher = rememberFilePickerLauncher(
             type = PickerType.Video,
-            title = "Select a Video File",
-            onResult = { file ->
-                file?.let { playerState.openFile(it) }
-                // Or: file?.let { playerState.openUri(it.getUri()) }
+            title = "Select a video"
+        ) { file ->
+            file?.let {
+                playerState.openFile(it)
             }
-        )
+        }
+
+        // Launcher for selecting a local subtitle file (VTT format)
+        val subtitleFileLauncher = rememberFilePickerLauncher(
+            type = PickerType.File(extensions = listOf("vtt")),
+            title = "Select a subtitle file"
+        ) { file ->
+            file?.let {
+                val subtitleUri = it.getUri()
+                val track = SubtitleTrack(
+                    label = it.name ?: "Local",
+                    language = "en",
+                    src = subtitleUri
+                )
+                // Add the track to the list and select it
+                subtitleTracks.add(track)
+                selectedSubtitleTrack = track
+                playerState.selectSubtitleTrack(track)
+            }
+        }
+
+        // Initially add a default subtitle track via URL
+        LaunchedEffect(Unit) {
+            val defaultTrack = SubtitleTrack(
+                label = "Default Subtitles",
+                language = "en",
+                src = "https://gist.githubusercontent.com/samdutton/ca37f3adaf4e23679957b8083e061177/raw/e19399fbccbc069a2af4266e5120ae6bad62699a/sample.vtt"
+            )
+            subtitleTracks.add(defaultTrack)
+            selectedSubtitleTrack = defaultTrack
+            playerState.selectSubtitleTrack(defaultTrack)
+        }
+
+        // State to show/hide the subtitle management dialog
+        var showSubtitleDialog by remember { mutableStateOf(false) }
 
         Box(
             modifier = Modifier
@@ -51,43 +99,45 @@ fun App() {
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    // Header
+                // Header with title and loading indicator
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        "Compose Media Player",
+                        text = "Compose Media Player",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-
-                    Box {
-                        if(playerState.isLoading){
-                            CircularProgressIndicator()
-                        }
+                    if (playerState.isLoading) {
+                        CircularProgressIndicator()
                     }
                 }
 
-                // Video Area
+                // Video display area
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.BottomCenter
                 ) {
                     VideoPlayerSurface(
                         playerState = playerState,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(16.dp)),
+                            .clip(RoundedCornerShape(16.dp))
                     )
+                    // Optionally, add an overlay to display subtitles if the player does not handle it internally.
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Timeline
+                // Video timeline and slider
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Slider(
                         value = playerState.sliderPos,
@@ -106,17 +156,16 @@ fun App() {
                             inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
                         )
                     )
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            playerState.positionText,
+                            text = playerState.positionText,
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            playerState.durationText,
+                            text = playerState.durationText,
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -124,50 +173,56 @@ fun App() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Main Controls
+                // Primary controls: load video, play/pause, stop
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilledIconButton(
-                        onClick = { fileKitLauncher.launch() },
+                        onClick = { videoFileLauncher.launch() },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
                         )
                     ) {
-                        Icon(Icons.Default.UploadFile, "Pick a file")
+                        Icon(Icons.Default.UploadFile, contentDescription = "Load Video")
                     }
-
                     FilledIconButton(
                         onClick = {
-                            if (playerState.isPlaying) playerState.pause()
-                            else playerState.play()
+                            if (playerState.isPlaying) playerState.pause() else playerState.play()
                         },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     ) {
                         Icon(
-                            imageVector = if (playerState.isPlaying) Icons.Default.Pause
-                            else Icons.Default.PlayArrow,
+                            imageVector = if (playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (playerState.isPlaying) "Pause" else "Play"
                         )
                     }
-
                     FilledIconButton(
                         onClick = { playerState.stop() },
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer
                         )
                     ) {
-                        Icon(Icons.Default.Stop, "Stop")
+                        Icon(Icons.Default.Stop, contentDescription = "Stop")
                     }
+
+                    FilledIconButton(
+                        onClick = { showSubtitleDialog = true },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Icon(Icons.Default.Subtitles, contentDescription = "Subtitles")
+                    }
+
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Secondary Controls Card
+                // Secondary controls: volume, loop, video URL input and subtitle management dialog trigger
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -175,14 +230,13 @@ fun App() {
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Volume control
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.width(200.dp)
@@ -205,27 +259,25 @@ fun App() {
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
-
                                 Slider(
                                     value = playerState.volume,
                                     onValueChange = { playerState.volume = it },
                                     valueRange = 0f..1f,
                                     modifier = Modifier.width(100.dp)
                                 )
-
                                 Text(
-                                    "${(playerState.volume * 100).toInt()}%",
+                                    text = "${(playerState.volume * 100).toInt()}%",
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.width(40.dp)
                                 )
                             }
-
+                            // Loop control
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Text(
-                                    "Loop",
+                                    text = "Loop",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Switch(
@@ -234,46 +286,42 @@ fun App() {
                                 )
                             }
                         }
-
                         Spacer(modifier = Modifier.height(8.dp))
-
-                        // Subtitle Selection Menu
-                        SubtitleSelectionMenu(playerState = playerState)
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
+                        // Video URL input
                         OutlinedTextField(
-                            value = url,
-                            onValueChange = { url = it },
+                            value = videoUrl,
+                            onValueChange = { videoUrl = it },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Video URL") },
                             trailingIcon = {
                                 IconButton(
                                     onClick = {
-                                        if (url.isNotEmpty()) {
-                                            playerState.openUri(url)
+                                        if (videoUrl.isNotEmpty()) {
+                                            playerState.openUri(videoUrl)
                                         }
                                     }
                                 ) {
-                                    Icon(Icons.Default.PlayCircle, "Open URL")
+                                    Icon(Icons.Default.PlayCircle, contentDescription = "Open URL")
                                 }
                             },
                             singleLine = true,
                             shape = RoundedCornerShape(8.dp)
                         )
                     }
-
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("L: ${playerState.leftLevel.toInt()}%")
-                        Text("R: ${playerState.rightLevel.toInt()}%")
+                        Text("Left: ${playerState.leftLevel.toInt()}%")
+                        Text("Right: ${playerState.rightLevel.toInt()}%")
                     }
                 }
+
             }
 
-            // Repositioned Error Snackbar
+            // Animated error Snackbar
             playerState.error?.let { error ->
                 AnimatedVisibility(
                     visible = true,
@@ -291,18 +339,18 @@ fun App() {
                                     contentColor = MaterialTheme.colorScheme.inversePrimary
                                 )
                             ) {
-                                Text("Dismiss")
+                                Text("Close")
                             }
                         },
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ) {
                         Text(
-                            when (error) {
-                                is VideoPlayerError.CodecError -> "Codec Error: ${error.message}"
-                                is VideoPlayerError.NetworkError -> "Network Error: ${error.message}"
-                                is VideoPlayerError.SourceError -> "Source Error: ${error.message}"
-                                is VideoPlayerError.UnknownError -> "Unknown Error: ${error.message}"
+                            text = when (error) {
+                                is VideoPlayerError.CodecError -> "Codec error: ${error.message}"
+                                is VideoPlayerError.NetworkError -> "Network error: ${error.message}"
+                                is VideoPlayerError.SourceError -> "Source error: ${error.message}"
+                                is VideoPlayerError.UnknownError -> "Unknown error: ${error.message}"
                             },
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -310,66 +358,182 @@ fun App() {
                     }
                 }
             }
+
+            // Subtitle management dialog
+            if (showSubtitleDialog) {
+                playerState.hideMedia()
+                SubtitleManagementDialog(
+                    subtitleTracks = subtitleTracks,
+                    selectedSubtitleTrack = selectedSubtitleTrack,
+                    onSubtitleSelected = { track ->
+                        selectedSubtitleTrack = track
+                        playerState.selectSubtitleTrack(track)
+                    },
+                    onDisableSubtitles = {
+                        selectedSubtitleTrack = null
+                        playerState.disableSubtitles()
+                    },
+                    subtitleFileLauncher = { subtitleFileLauncher.launch() },
+                    onDismiss = {
+                        showSubtitleDialog = false
+                        playerState.showMedia()
+                    }
+                )
+            }
         }
     }
 }
 
-/**
- * Context menu for subtitle selection/activation.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SubtitleSelectionMenu(playerState: VideoPlayerState) {
-    // Local state for menu open/close
-    var expanded by remember { mutableStateOf(false) }
+fun SubtitleManagementDialog(
+    subtitleTracks: List<SubtitleTrack>,
+    selectedSubtitleTrack: SubtitleTrack?,
+    onSubtitleSelected: (SubtitleTrack) -> Unit,
+    onDisableSubtitles: () -> Unit,
+    subtitleFileLauncher: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Initial value for the subtitle URL
+    var subtitleUrl by remember {
+        mutableStateOf("https://gist.githubusercontent.com/samdutton/ca37f3adaf4e23679957b8083e061177/raw/e19399fbccbc069a2af4266e5120ae6bad62699a/sample.vtt")
+    }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    // Variable to store the button width
+    var buttonWidth by remember { mutableStateOf(0.dp) }
+    // LocalDensity for converting between pixels and dp
+    val density = LocalDensity.current
 
-    // Text displayed on the button. Display the active track name,
-    // or "Disabled" if no subtitle is selected.
-    val currentSubtitleLabel = playerState.currentSubtitleTrack?.name ?: "Disabled"
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Subtitles: ",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(end = 8.dp)
-        )
-
-        Box {
-            // Button to open/close the menu
-            OutlinedButton(onClick = { expanded = !expanded }) {
-                Text(
-                    currentSubtitleLabel,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Menu listing the different tracks + "Disabled" option
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Subtitle Management",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
             ) {
-                // Option: Disabled
-                DropdownMenuItem(
-                    text = { Text("Disabled") },
-                    onClick = {
-                        expanded = false
-                        playerState.disableSubtitles()
-                    }
+                // Section to add a subtitle via URL
+                Text(
+                    text = "Add via URL",
+                    style = MaterialTheme.typography.titleMedium
                 )
-
-                // Create a menu item for each available track
-                playerState.availableSubtitleTracks.forEach { track ->
-                    DropdownMenuItem(
-                        text = { Text(track.name) },
-                        onClick = {
-                            expanded = false
-                            playerState.selectSubtitleTrack(track)
-                        }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = subtitleUrl,
+                        onValueChange = { subtitleUrl = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("Subtitle URL") },
+                        singleLine = true,
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ElevatedButton(
+                        onClick = {
+                            if (subtitleUrl.isNotBlank()) {
+                                val track = SubtitleTrack(
+                                    label = "URL Subtitles",
+                                    language = "en",
+                                    src = subtitleUrl
+                                )
+                                // Add the new subtitle track and select it
+                                (subtitleTracks as? MutableList)?.add(track)
+                                onSubtitleSelected(track)
+                            }
+                        }
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Button to choose a local file
+                Text(
+                    text = "Or choose a local file",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                ElevatedButton(
+                    onClick = subtitleFileLauncher,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(imageVector = Icons.Default.FolderOpen, contentDescription = "Local file")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Select File")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Dropdown menu to select an existing subtitle track or disable subtitles
+                if (subtitleTracks.isNotEmpty()) {
+                    Text(
+                        text = "Select a subtitle track",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box {
+                        ElevatedButton(
+                            onClick = { dropdownExpanded = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coordinates ->
+                                    // Convert the button width from pixels to dp
+                                    buttonWidth = with(density) { coordinates.size.width.toDp() }
+                                }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Subtitles,
+                                contentDescription = "Subtitles"
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Current: ${selectedSubtitleTrack?.label ?: "None"}"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = { dropdownExpanded = false },
+                            modifier = Modifier.width(buttonWidth)
+                        ) {
+                            subtitleTracks.forEach { track ->
+                                DropdownMenuItem(
+                                    onClick = {
+                                        onSubtitleSelected(track)
+                                        dropdownExpanded = false
+                                    },
+                                    text = { Text(track.label) }
+                                )
+                            }
+                            DropdownMenuItem(
+                                onClick = {
+                                    onDisableSubtitles()
+                                    dropdownExpanded = false
+                                },
+                                text = { Text("Disable Subtitles") }
+                            )
+                        }
+                    }
                 }
             }
-        }
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", style = MaterialTheme.typography.labelLarge)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        tonalElevation = 6.dp
+    )
 }
