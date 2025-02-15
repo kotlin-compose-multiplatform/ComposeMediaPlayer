@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -114,13 +115,24 @@ fun App() {
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.BottomCenter
                 ) {
+
                     VideoPlayerSurface(
                         playerState = playerState,
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(16.dp))
                     )
-                    // Optionally, add an overlay to display subtitles if the player does not handle it internally.
+
+                    if (playerState.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Transparent),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -380,7 +392,7 @@ fun SubtitleManagementDialog(
     onSubtitleSelected: (SubtitleTrack) -> Unit,
     onDisableSubtitles: () -> Unit,
     subtitleFileLauncher: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     // Initial value for the subtitle URL
     var subtitleUrl by remember {
