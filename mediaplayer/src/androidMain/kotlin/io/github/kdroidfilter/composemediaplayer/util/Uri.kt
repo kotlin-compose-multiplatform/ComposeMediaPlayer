@@ -1,4 +1,4 @@
-package sample.app
+package io.github.kdroidfilter.composemediaplayer.util
 
 import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile

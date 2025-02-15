@@ -72,6 +72,11 @@ actual open class VideoPlayerState {
 
     actual open val metadata: VideoMetadata get() = delegate.metadata
 
+    actual var subtitlesEnabled = delegate.subtitlesEnabled
+    actual var currentSubtitleTrack : SubtitleTrack? = delegate.currentSubtitleTrack
+    actual val availableSubtitleTracks  = delegate.availableSubtitleTracks
+    actual fun selectSubtitleTrack(track: SubtitleTrack?) = delegate.selectSubtitleTrack(track)
+    actual fun disableSubtitles() = delegate.disableSubtitles()
 
     actual open val leftLevel: Float get() = delegate.leftLevel
     actual open val rightLevel: Float get() = delegate.rightLevel
@@ -86,4 +91,6 @@ actual open class VideoPlayerState {
     actual open fun seekTo(value: Float) = delegate.seekTo(value)
     actual open fun dispose() = delegate.dispose()
     actual open fun clearError() = delegate.clearError()
+    actual open fun hideMedia() { delegate.hideMedia() }
+    actual open fun showMedia() { delegate.showMedia()}
 }

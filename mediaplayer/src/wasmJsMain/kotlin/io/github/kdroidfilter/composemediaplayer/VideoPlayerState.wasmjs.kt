@@ -15,6 +15,7 @@ import kotlin.time.TimeSource
 @Stable
 actual open class VideoPlayerState {
 
+
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var lastUpdateTime = TimeSource.Monotonic.markNow()
 
@@ -27,6 +28,14 @@ actual open class VideoPlayerState {
     private var _hasMedia by mutableStateOf(false)
     actual val hasMedia: Boolean get() = _hasMedia
 
+    actual fun hideMedia() {
+        _hasMedia = false
+    }
+
+    actual fun showMedia() {
+        _hasMedia = true
+    }
+
     internal var _isLoading by mutableStateOf(false)
     actual val isLoading: Boolean get() = _isLoading
 
@@ -34,6 +43,23 @@ actual open class VideoPlayerState {
     actual val error: VideoPlayerError? get() = _error
 
     actual val metadata = VideoMetadata()
+
+    actual var subtitlesEnabled = false
+    actual var currentSubtitleTrack: SubtitleTrack? = null
+    actual val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
+
+    actual fun selectSubtitleTrack(track: SubtitleTrack?) {
+        // Active les sous-titres et sélectionne la piste donnée
+        currentSubtitleTrack = track
+        subtitlesEnabled = (track != null)
+    }
+
+
+    actual fun disableSubtitles() {
+        // Désactive les sous-titres
+        currentSubtitleTrack = null
+        subtitlesEnabled = false
+    }
 
     actual var volume by mutableStateOf(1.0f)
     actual var sliderPos by mutableStateOf(0.0f)

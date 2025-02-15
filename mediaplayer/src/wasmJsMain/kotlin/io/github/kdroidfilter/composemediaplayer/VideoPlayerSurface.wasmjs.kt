@@ -1,7 +1,15 @@
 package io.github.kdroidfilter.composemediaplayer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
 import io.github.kdroidfilter.composemediaplayer.htmlinterop.HtmlView
 import io.github.kdroidfilter.composemediaplayer.util.logger
 import kotlinx.browser.document
@@ -9,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.w3c.dom.HTMLTrackElement
 import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
 import kotlin.math.abs
@@ -16,70 +25,137 @@ import kotlin.math.abs
 
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
-    var videoElement by remember { mutableStateOf<HTMLVideoElement?>(null) }
-    val scope = rememberCoroutineScope()
+    if (playerState.hasMedia) {
 
-    // Create HTML video element
-    HtmlView(
-        factory = {
-            createVideoElement()
-        },
-        modifier = modifier,
-        update = { video ->
-            videoElement = video
-            setupVideoElement(video, playerState, scope)
-        }
-    )
+        var videoElement by remember { mutableStateOf<HTMLVideoElement?>(null) }
+        var videoRatio by remember { mutableStateOf<Float?>(null) }
+        val scope = rememberCoroutineScope()
 
-    // Handle source change effect
-    LaunchedEffect(playerState.sourceUri) {
-        videoElement?.let {
-            it.src = playerState.sourceUri ?: ""
-            if (playerState.isPlaying) {
-                it.play()
-            } else {
-                it.pause()
-            }
-        }
-    }
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .background(Color.Transparent)
+                .drawBehind {
+                    videoRatio?.let { ratio ->
+                        // We calculate a centered rectangle respecting the ratio of the video
+                        val containerWidth = size.width
+                        val containerHeight = size.height
+                        val rectWidth: Float
+                        val rectHeight: Float
+                        if (containerWidth / containerHeight > ratio) {
+                            // The Box is too wide, we base ourselves on the height
+                            rectHeight = containerHeight
+                            rectWidth = rectHeight * ratio
+                        } else {
+                            // The Box is too high, we base ourselves on the width
+                            rectWidth = containerWidth
+                            rectHeight = rectWidth / ratio
+                        }
+                        val offsetX = (containerWidth - rectWidth) / 2f
+                        val offsetY = (containerHeight - rectHeight) / 2f
 
-    // Handle play/pause
-    LaunchedEffect(playerState.isPlaying) {
-        videoElement?.let {
-            if (playerState.isPlaying) {
-                it.play()
-            } else {
-                it.pause()
-            }
-        }
-    }
-
-    // Handle volume update
-    LaunchedEffect(playerState.volume) {
-        videoElement?.volume = playerState.volume.toDouble()
-    }
-
-    // Handle loop update
-    LaunchedEffect(playerState.loop) {
-        videoElement?.loop = playerState.loop
-    }
-
-    // Handle seek via sliderPos (with debounce)
-    LaunchedEffect(playerState.sliderPos) {
-        if (!playerState.userDragging && playerState.hasMedia) {
-            val job = scope.launch {
-                val duration = videoElement?.duration?.toFloat() ?: 0f
-                if (duration > 0f) {
-                    val newTime = (playerState.sliderPos / VideoPlayerState.PERCENTAGE_MULTIPLIER) * duration
-                    // Avoid seeking if the difference is small
-                    if (abs((videoElement?.currentTime ?: 0.0) - newTime) > 0.5) {
-                        videoElement?.currentTime = newTime.toDouble()
+                        drawRect(
+                            color = Color.Transparent,
+                            blendMode = BlendMode.Clear,
+                            topLeft = Offset(offsetX, offsetY),
+                            size = Size(rectWidth, rectHeight)
+                        )
                     }
                 }
+        ) {
+
+            // Create HTML video element
+            HtmlView(
+                factory = {
+                    createVideoElement()
+                },
+                modifier = modifier,
+                update = { video ->
+                    videoElement = video
+
+                    video.addEventListener("loadedmetadata") {
+                        val width = video.videoWidth
+                        val height = video.videoHeight
+                        if (height != 0) {
+                            videoRatio = width.toFloat() / height.toFloat()
+                            logger.debug { "The video ratio is updated: $videoRatio" }
+                        }
+                    }
+
+                    setupVideoElement(video, playerState, scope)
+                }
+            )
+        }
+
+        // Handle source change effect
+        LaunchedEffect(playerState.sourceUri) {
+            videoElement?.let {
+                it.src = playerState.sourceUri ?: ""
+                if (playerState.isPlaying) {
+                    it.play()
+                } else {
+                    it.pause()
+                }
             }
-            // Cancel previous job if a new sliderPos arrives before completion
-            playerState.seekJob?.cancel()
-            playerState.seekJob = job
+        }
+
+        // Handle play/pause
+        LaunchedEffect(playerState.isPlaying) {
+            videoElement?.let {
+                if (playerState.isPlaying) {
+                    it.play()
+                } else {
+                    it.pause()
+                }
+            }
+        }
+
+        // Handle volume update
+        LaunchedEffect(playerState.volume) {
+            videoElement?.volume = playerState.volume.toDouble()
+        }
+
+        // Handle loop update
+        LaunchedEffect(playerState.loop) {
+            videoElement?.loop = playerState.loop
+        }
+
+        // Handle seek via sliderPos (with debounce)
+        LaunchedEffect(playerState.sliderPos) {
+            if (!playerState.userDragging && playerState.hasMedia) {
+                val job = scope.launch {
+                    val duration = videoElement?.duration?.toFloat() ?: 0f
+                    if (duration > 0f) {
+                        val newTime = (playerState.sliderPos / VideoPlayerState.PERCENTAGE_MULTIPLIER) * duration
+                        // Avoid seeking if the difference is small
+                        if (abs((videoElement?.currentTime ?: 0.0) - newTime) > 0.5) {
+                            videoElement?.currentTime = newTime.toDouble()
+                        }
+                    }
+                }
+                // Cancel previous job if a new sliderPos arrives before completion
+                playerState.seekJob?.cancel()
+                playerState.seekJob = job
+            }
+        }
+
+        LaunchedEffect(playerState.currentSubtitleTrack) {
+            videoElement?.let { video ->
+                val trackElements = video.querySelectorAll("track")
+                for (i in 0 until trackElements.length) {
+                    val track = trackElements.item(i)
+                    track?.let { video.removeChild(it) }
+                }
+
+                playerState.currentSubtitleTrack?.let { track ->
+                    val trackElement = document.createElement("track") as HTMLTrackElement
+                    trackElement.kind = "subtitles"
+                    trackElement.label = track.label
+                    trackElement.srclang = track.language
+                    trackElement.src = track.src
+                    trackElement.default = true
+                    video.appendChild(trackElement)
+                }
+            }
         }
     }
 }
@@ -87,20 +163,25 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
 private fun createVideoElement(): HTMLVideoElement {
     return (document.createElement("video") as HTMLVideoElement).apply {
         controls = false
+        // Absolute position to fit the video in its container
+        style.position = "absolute"
+
+        // negative z-index => in background
+        style.zIndex = "-1"
+
         style.width = "100%"
         style.height = "100%"
         crossOrigin = "anonymous"
     }
 }
 
-/**
- * Configure video element: listeners, WebAudioAnalyzer, etc.
- */
+
+/** Configure video element: listeners, WebAudioAnalyzer, etc. */
 fun setupVideoElement(
     video: HTMLVideoElement,
     playerState: VideoPlayerState,
     scope: CoroutineScope,
-    enableAudioDetection: Boolean = true
+    enableAudioDetection: Boolean = true,
 ) {
     logger.debug { "Setup video => enableAudioDetection = $enableAudioDetection" }
 
@@ -222,3 +303,4 @@ private fun VideoPlayerState.onTimeUpdateEvent(event: Event) {
         onTimeUpdate(it.currentTime.toFloat(), it.duration.toFloat())
     }
 }
+

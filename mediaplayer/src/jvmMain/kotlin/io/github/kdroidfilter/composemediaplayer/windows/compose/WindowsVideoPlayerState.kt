@@ -8,6 +8,7 @@ import com.sun.jna.WString
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.ptr.FloatByReference
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
@@ -64,6 +65,9 @@ internal class WindowsVideoPlayerState : PlatformVideoPlayerState {
         get() = _isPlaying
 
 
+    override fun showMedia() { _hasMedia = true }
+    override fun hideMedia() { _hasMedia = false }
+
     private var _volume by mutableStateOf(1f)
     override var volume: Float
         get() = _volume
@@ -118,7 +122,17 @@ internal class WindowsVideoPlayerState : PlatformVideoPlayerState {
     override val error: VideoPlayerError?
         get() = _error
 
-    override val metadata: VideoMetadata = VideoMetadata()
+    override val metadata: VideoMetadata = VideoMetadata() //todo
+    override var subtitlesEnabled: Boolean = false //todo
+    override var currentSubtitleTrack: SubtitleTrack? = null
+    override val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
+
+    override fun selectSubtitleTrack(track: SubtitleTrack?) {
+
+    }
+
+    override fun disableSubtitles() {
+    }
 
     var errorMessage by mutableStateOf<String?>(null)
         private set

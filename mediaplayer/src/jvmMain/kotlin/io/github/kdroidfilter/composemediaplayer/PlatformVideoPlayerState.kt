@@ -42,6 +42,13 @@ interface PlatformVideoPlayerState {
 
     val metadata: VideoMetadata
 
+    // Subtitle management
+    var subtitlesEnabled: Boolean
+    var currentSubtitleTrack: SubtitleTrack?
+    val availableSubtitleTracks: MutableList<SubtitleTrack>
+    fun selectSubtitleTrack(track: SubtitleTrack?)
+    fun disableSubtitles()
+
     fun openUri(uri: String)
     fun play()
     fun pause()
@@ -49,5 +56,7 @@ interface PlatformVideoPlayerState {
     fun seekTo(value: Float)
     fun dispose()
     fun clearError()
+    fun hideMedia()
+    fun showMedia()
 
 }

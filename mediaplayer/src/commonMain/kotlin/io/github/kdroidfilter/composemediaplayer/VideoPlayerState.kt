@@ -19,8 +19,11 @@ import io.github.vinceglb.filekit.PlatformFile
  */
 @Stable
 expect open class VideoPlayerState() {
-    val hasMedia : Boolean
+
+    // Properties related to media state
+    val hasMedia: Boolean
     val isPlaying: Boolean
+    val isLoading: Boolean
     var volume: Float
     var sliderPos: Float
     var userDragging: Boolean
@@ -29,20 +32,35 @@ expect open class VideoPlayerState() {
     val rightLevel: Float
     val positionText: String
     val durationText: String
-    val isLoading: Boolean
 
-    val error: VideoPlayerError?
-
-    val metadata: VideoMetadata
-
-    fun openUri(uri: String)
-    fun openFile(file: PlatformFile)
+    // Functions to control playback
     fun play()
     fun pause()
     fun stop()
     fun seekTo(value: Float)
-    fun dispose()
+    fun hideMedia()
+    fun showMedia()
+
+    // Functions to manage media sources
+    fun openUri(uri: String)
+    fun openFile(file: PlatformFile)
+
+    // Error handling
+    val error: VideoPlayerError?
     fun clearError()
+
+    // Metadata
+    val metadata: VideoMetadata
+
+    // Subtitle management
+    var subtitlesEnabled: Boolean
+    var currentSubtitleTrack: SubtitleTrack?
+    val availableSubtitleTracks: MutableList<SubtitleTrack>
+    fun selectSubtitleTrack(track: SubtitleTrack?)
+    fun disableSubtitles()
+
+    // Cleanup
+    fun dispose()
 }
 
 /**
