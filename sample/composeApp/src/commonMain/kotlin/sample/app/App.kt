@@ -396,7 +396,7 @@ fun SubtitleManagementDialog(
 ) {
     // Initial value for the subtitle URL
     var subtitleUrl by remember {
-        mutableStateOf("https://gist.githubusercontent.com/samdutton/ca37f3adaf4e23679957b8083e061177/raw/e19399fbccbc069a2af4266e5120ae6bad62699a/sample.vtt")
+        mutableStateOf("https://raw.githubusercontent.com/kdroidFilter/ComposeMediaPlayer/refs/heads/master/assets/subtitles/en.vtt")
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
     // Variable to store the button width
