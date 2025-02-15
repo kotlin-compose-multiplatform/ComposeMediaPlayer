@@ -213,6 +213,34 @@ if (playerState.isLoading) {
 > [!IMPORTANT]
 > This feature is actually on Beta, so it may not work as expected. It's not actually work on Windows and MacOS.
 
+### Using Subtitles
+
+Compose Media Player supports adding subtitles from both URLs and local files. 
+> [!IMPORTANT]
+> This feature is actually not supported on Windows and Mac.
+
+#### 🎯 Adding Subtitles from url or local file
+
+You can add subtitles by specifying a URL:
+
+```kotlin
+val track = SubtitleTrack(
+    label = "English Subtitles",
+    language = "en",
+    src = "https://example.com/subtitles.vtt"
+)
+playerState.selectSubtitleTrack(track)
+```
+
+#### ❌ Disabling Subtitles
+
+To disable subtitles:
+
+```kotlin
+playerState.disableSubtitles()
+```
+
+
 ### 📋 Basic Example
 
 Here is a minimal example of how to integrate the Compose Media Player into your Compose application with a hardcoded URL:
@@ -304,4 +332,7 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 <p align="center">
   <img src="assets/screenshots/android_sample.png" alt="Android Sample" height="500">
 </p>
+
+
+
 
