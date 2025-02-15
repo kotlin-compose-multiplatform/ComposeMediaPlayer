@@ -11,10 +11,9 @@
 
 Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/ComposeMediaPlayer/sample/)
 
-
 ## ✨ Features
 
-- **Multiplatform Support**: Works seamlessly on Android, macOS, Windows, and Linux.
+- **Multiplatform Support**: Works seamlessly on Android, macOS, Windows, Linux and Compose Web (Wasm).
 - **File and URL Support**: Play videos from local files or directly from URLs.
 - **Media Controls**: Includes play, pause, loop toggle, volume control, loop playback and timeline slider.
 - **Custom Video Player UI**: Fully customizable using Compose Multiplatform.
