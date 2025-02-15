@@ -64,12 +64,40 @@ actual open class VideoPlayerState {
         currentSubtitleTrack = track
         subtitlesEnabled = true
 
-        // When using external subtitles, the media item must include the subtitle configuration.
-        // If media is already loaded, consider reloading the media item with the new subtitle track.
         exoPlayer?.let { player ->
+            // Get current playback position and playing state
+            val currentPos = player.currentPosition
+            val wasPlaying = player.isPlaying
+
+            // If media is already loaded, we need to reload it with the new subtitle configuration
+            if (player.currentMediaItem != null) {
+                val currentUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
+                if (currentUri != null) {
+                    // Create new MediaItem with subtitle configuration
+                    val mediaItemBuilder = MediaItem.Builder().setUri(currentUri)
+                    val subtitleUri = Uri.parse(track.src)
+                    val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                        .setMimeType(MimeTypes.TEXT_VTT)
+                        .setLanguage(track.language)
+                        .setLabel(track.label)
+                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                        .build()
+                    mediaItemBuilder.setSubtitleConfigurations(listOf(subtitleConfig))
+
+                    // Replace current media item
+                    player.setMediaItem(mediaItemBuilder.build())
+                    player.prepare()
+
+                    // Restore playback state
+                    player.seekTo(currentPos)
+                    if (wasPlaying) player.play()
+                }
+            }
+
+            // Update track selection parameters
             val trackParameters = player.trackSelectionParameters.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false) // Enable text tracks
-                .setPreferredTextLanguage(track.language)         // Set preferred language
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setPreferredTextLanguage(track.language)
                 .build()
             player.trackSelectionParameters = trackParameters
         }
