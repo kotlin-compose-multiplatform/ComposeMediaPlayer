@@ -5,8 +5,6 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 
 fun main()  {
-    System.setProperty("compose.interop.blending", "true")
-
     application {
         val windowState = rememberWindowState()
         Window(

@@ -76,22 +76,19 @@ class JavaFxVideoPlayerState : PlatformVideoPlayerState {
     override val durationText: String get() = formatTime(_duration)
     override val isLoading: Boolean get() = _isLoading
     override val error: VideoPlayerError? get() = _error
-    override val metadata: VideoMetadata = VideoMetadata()
-    override var subtitlesEnabled: Boolean
-        get() = TODO("Not yet implemented")
-        set(value) {}
-    override var currentSubtitleTrack: SubtitleTrack?
-        get() = TODO("Not yet implemented")
-        set(value) {}
+
+    override val metadata: VideoMetadata = VideoMetadata() //todo
+
+
+    override var subtitlesEnabled: Boolean = false //todo
+    override var currentSubtitleTrack: SubtitleTrack? = null
     override  val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
 
 
     override fun selectSubtitleTrack(track: SubtitleTrack?) {
-        TODO("Not yet implemented")
     }
 
     override fun disableSubtitles() {
-        TODO("Not yet implemented")
     }
 
     // Main function to update the MediaView
