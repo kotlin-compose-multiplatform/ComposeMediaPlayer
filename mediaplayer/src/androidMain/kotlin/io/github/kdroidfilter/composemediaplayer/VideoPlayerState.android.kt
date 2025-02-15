@@ -1,36 +1,31 @@
 package io.github.kdroidfilter.composemediaplayer
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.PlaybackException
+import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.ui.PlayerView
 import com.kdroid.androidcontextprovider.ContextProvider
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.kdroidfilter.composemediaplayer.util.logger
 import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.PlatformFile
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+
 
 @UnstableApi
 @Stable
 actual open class VideoPlayerState {
-    private val context = ContextProvider.getContext()
+    private val context: Context = ContextProvider.getContext()
     internal var exoPlayer: ExoPlayer? = null
     private var updateJob: Job? = null
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -52,11 +47,54 @@ actual open class VideoPlayerState {
     private var _metadata = VideoMetadata()
     actual val metadata: VideoMetadata get() = _metadata
 
-    actual var subtitlesEnabled = false
-    actual var currentSubtitleTrack : SubtitleTrack? = null
+    // Subtitle state
+    actual var subtitlesEnabled by mutableStateOf(false)
+    actual var currentSubtitleTrack by mutableStateOf<SubtitleTrack?>(null)
     actual val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
-    actual fun selectSubtitleTrack(track: SubtitleTrack?){}
-    actual fun disableSubtitles() {}
+
+    private var playerView: PlayerView? = null
+
+    // Select an external subtitle track before media preparation
+    actual fun selectSubtitleTrack(track: SubtitleTrack?) {
+        if (track == null) {
+            disableSubtitles()
+            return
+        }
+        // Update current track and enable flag.
+        currentSubtitleTrack = track
+        subtitlesEnabled = true
+
+        // When using external subtitles, the media item must include the subtitle configuration.
+        // If media is already loaded, consider reloading the media item with the new subtitle track.
+        exoPlayer?.let { player ->
+            val trackParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false) // Enable text tracks
+                .setPreferredTextLanguage(track.language)         // Set preferred language
+                .build()
+            player.trackSelectionParameters = trackParameters
+        }
+    }
+
+    actual fun disableSubtitles() {
+        exoPlayer?.let { player ->
+            val parameters = player.trackSelectionParameters.buildUpon()
+                .setPreferredTextLanguage(null)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            player.trackSelectionParameters = parameters
+        }
+        currentSubtitleTrack = null
+        subtitlesEnabled = false
+    }
+
+    internal fun attachPlayerView(view: PlayerView) {
+        playerView = view
+        exoPlayer?.let { player ->
+            view.player = player
+            // Set default subtitle style
+            view.subtitleView?.setStyle(CaptionStyleCompat.DEFAULT)
+        }
+    }
 
     // Volume control
     private var _volume by mutableStateOf(1f)
@@ -101,7 +139,6 @@ actual open class VideoPlayerState {
     private var _duration by mutableStateOf(0.0)
     actual val positionText: String get() = formatTime(_currentTime)
     actual val durationText: String get() = formatTime(_duration)
-
 
     actual fun hideMedia() { _hasMedia = false }
     actual fun showMedia() { _hasMedia = true }
@@ -199,7 +236,6 @@ actual open class VideoPlayerState {
                         }
                     }
                 }
-
                 delay(16) // ~60fps update rate
             }
         }
@@ -210,16 +246,50 @@ actual open class VideoPlayerState {
         updateJob = null
     }
 
+    /**
+     * Open a video URI.
+     * If a subtitle track is selected, add it as an external subtitle source.
+     */
     actual fun openUri(uri: String) {
-        val mediaItem = MediaItem.fromUri(uri)
+        val mediaItemBuilder = MediaItem.Builder().setUri(uri)
+        currentSubtitleTrack?.let { subtitle ->
+            // Build subtitle configuration for external subtitle
+            val subtitleUri = Uri.parse(subtitle.src)
+            val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                .setMimeType(MimeTypes.TEXT_VTT) // Adjust MIME type as needed
+                .setLanguage(subtitle.language)
+                .setLabel(subtitle.label)
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+            mediaItemBuilder.setSubtitleConfigurations(listOf(subtitleConfig))
+        }
+        val mediaItem = mediaItemBuilder.build()
         openFromMediaItem(mediaItem)
     }
 
+    /**
+     * Open a video file.
+     * Converts the file into a URI and adds external subtitle configuration if selected.
+     */
     actual fun openFile(file: PlatformFile) {
-        val mediaItem = when (val androidFile = file.androidFile) {
-            is AndroidFile.UriWrapper -> MediaItem.fromUri(androidFile.uri)
-            is AndroidFile.FileWrapper -> MediaItem.fromUri(androidFile.file.path)
+        val mediaItemBuilder = MediaItem.Builder()
+        val androidFile = file.androidFile
+        val videoUri: Uri = when (androidFile) {
+            is AndroidFile.UriWrapper -> androidFile.uri
+            is AndroidFile.FileWrapper -> Uri.fromFile(androidFile.file)
         }
+        mediaItemBuilder.setUri(videoUri)
+        currentSubtitleTrack?.let { subtitle ->
+            val subtitleUri = Uri.parse(subtitle.src)
+            val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                .setMimeType(MimeTypes.TEXT_VTT)
+                .setLanguage(subtitle.language)
+                .setLabel(subtitle.label)
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+            mediaItemBuilder.setSubtitleConfigurations(listOf(subtitleConfig))
+        }
+        val mediaItem = mediaItemBuilder.build()
         openFromMediaItem(mediaItem)
     }
 
@@ -234,11 +304,11 @@ actual open class VideoPlayerState {
                 player.volume = volume
                 player.repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
                 player.play()
-                _hasMedia = true  // Set to true when media is loaded
+                _hasMedia = true // Set to true when media is loaded
             } catch (e: Exception) {
-                logger.debug{"Error opening media: ${e.message}"}
+                logger.debug { "Error opening media: ${e.message}" }
                 _isPlaying = false
-                _hasMedia = false  // Set to false on error
+                _hasMedia = false // Set to false on error
                 _error = VideoPlayerError.SourceError("Failed to load media: ${e.message}")
             }
         }
@@ -262,7 +332,7 @@ actual open class VideoPlayerState {
     actual fun stop() {
         exoPlayer?.let { player ->
             player.stop()
-            player.seekTo(0) // Ensure position is reset to beginning
+            player.seekTo(0) // Reset position to beginning
         }
         _hasMedia = false
         resetStates(keepMedia = true)
@@ -296,6 +366,8 @@ actual open class VideoPlayerState {
     actual fun dispose() {
         stopPositionUpdates()
         coroutineScope.cancel()
+        playerView?.player = null
+        playerView = null
         exoPlayer?.let { player ->
             player.stop()
             player.release()
@@ -303,5 +375,4 @@ actual open class VideoPlayerState {
         exoPlayer = null
         resetStates()
     }
-
 }
