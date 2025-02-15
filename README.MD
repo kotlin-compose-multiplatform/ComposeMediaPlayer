@@ -36,7 +36,7 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:0.2.0")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.3.0")
 }
 ```
 
