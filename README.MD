@@ -7,6 +7,11 @@
 - **JavaFX** for macOS
 - **Media3** for Android
 
+## 🚀 Live Demo
+
+Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/ComposeMediaPlayer/sample/)
+
+
 ## ✨ Features
 
 - **Multiplatform Support**: Works seamlessly on Android, macOS, Windows, and Linux.
