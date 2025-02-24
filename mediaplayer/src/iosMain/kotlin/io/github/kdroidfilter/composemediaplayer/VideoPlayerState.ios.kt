@@ -1,19 +1,26 @@
 @file:OptIn(ExperimentalForeignApi::class)
 package io.github.kdroidfilter.composemediaplayer
 
-import androidx.compose.runtime.*
-import kotlinx.cinterop.ExperimentalForeignApi
-import platform.AVFoundation.*
-import platform.CoreMedia.*
-import platform.Foundation.*
-import platform.UIKit.*
-import platform.darwin.dispatch_get_main_queue
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.vinceglb.filekit.PlatformFile
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
+import platform.AVFoundation.*
+import platform.CoreGraphics.CGFloat
+import platform.CoreMedia.CMTimeGetSeconds
+import platform.CoreMedia.CMTimeMakeWithSeconds
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSURL
+import platform.darwin.dispatch_get_main_queue
 
 @OptIn(ExperimentalForeignApi::class)
 @Stable
 actual open class VideoPlayerState {
+
     // États de base
     private var _volume = mutableStateOf(1.0f)
     actual var volume: Float
@@ -62,16 +69,27 @@ actual open class VideoPlayerState {
     actual val leftLevel: Float = 0f
     actual val rightLevel: Float = 0f
 
+    // Rapport d'aspect vidéo observable (initialisé par défaut à 16:9)
+    private var _videoAspectRatio by mutableStateOf(16.0 / 9.0)
+    val videoAspectRatio: CGFloat
+        get() = _videoAspectRatio
+
     /**
-     * Démarre un observateur périodique pour mettre à jour la progression.
+     * Démarre un observateur périodique pour mettre à jour la progression et l'aspect ratio.
+     *
+     * Ici, en plus de mettre à jour la position de lecture, on vérifie régulièrement
+     * la propriété `presentationSize` de l’item courant et on met à jour le rapport d’aspect
+     * si besoin. Ainsi, dès que la taille réelle de la vidéo est connue ou change,
+     * l’interface sera recomposée avec le bon aspect ratio.
      */
     private fun startPositionUpdates() {
         stopPositionUpdates() // Nettoyage d'un observateur existant
-        val interval = CMTimeMakeWithSeconds(1.0 / 60.0, 600) // environ 60fps
+        val interval = CMTimeMakeWithSeconds(1.0 / 60.0, 600) // environ 60 fps
         timeObserverToken = player?.addPeriodicTimeObserverForInterval(
             interval = interval,
             queue = dispatch_get_main_queue(),
             usingBlock = { time ->
+                // Mise à jour du temps et de la position
                 val currentSeconds = CMTimeGetSeconds(time)
                 val durationSeconds = player?.currentItem?.duration?.let { CMTimeGetSeconds(it) } ?: 0.0
                 _currentTime = currentSeconds
@@ -82,6 +100,14 @@ actual open class VideoPlayerState {
                 }
                 _positionText = formatTime(currentSeconds.toFloat())
                 _durationText = formatTime(durationSeconds.toFloat())
+
+                // Mise à jour de l'aspect ratio en fonction de la presentationSize, si disponible
+                player?.currentItem?.presentationSize?.useContents {
+                    val newAspect = if (height != 0.0) width / height else 16.0 / 9.0
+                    if (newAspect != _videoAspectRatio) {
+                        _videoAspectRatio = newAspect
+                    }
+                }
             }
         )
     }
@@ -119,15 +145,22 @@ actual open class VideoPlayerState {
         removeEndObserver()
         player?.pause()
 
-        // Création d'un nouvel AVPlayerItem et AVPlayer
+        // Création d'un nouvel AVPlayerItem
         val playerItem = AVPlayerItem(nsUrl)
+
+        // Mise à jour initiale du rapport d'aspect (il sera aussi mis à jour dans l'observateur périodique)
+        playerItem.presentationSize.useContents {
+            _videoAspectRatio = if (height != 0.0) width / height else 16.0 / 9.0
+        }
+
+        // Création du player et configuration initiale
         player = AVPlayer(playerItem = playerItem).apply {
             volume = this@VideoPlayerState.volume
-            // On désactive l'action par défaut à la fin pour gérer nous-mêmes le comportement
+            // Désactivation de l'action automatique à la fin pour gérer le loop nous-mêmes
             actionAtItemEnd = AVPlayerActionAtItemEndNone
         }
 
-        // Ajouter l'observateur pour détecter la fin du média et gérer le comportement en fonction du loop
+        // Ajout de l'observateur pour la fin du média
         endObserver = NSNotificationCenter.defaultCenter.addObserverForName(
             name = AVPlayerItemDidPlayToEndTimeNotification,
             `object` = player?.currentItem,
@@ -137,17 +170,16 @@ actual open class VideoPlayerState {
                 player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
                 player?.play()
             } else {
-                // Si le loop est désactivé, on met en pause pour arrêter la lecture
                 player?.pause()
                 _isPlaying = false
             }
         }
 
-        // Démarrer l'observateur de position et marquer la présence d'un média
+        // Démarrage de l'observateur de position et marquage du média chargé
         startPositionUpdates()
         _hasMedia = true
 
-        // Lancer la lecture automatiquement
+        // Lancement de la lecture automatiquement
         play()
     }
 

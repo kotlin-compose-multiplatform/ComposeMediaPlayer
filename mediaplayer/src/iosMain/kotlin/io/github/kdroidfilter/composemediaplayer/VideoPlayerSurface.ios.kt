@@ -1,7 +1,7 @@
-@file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
-
+@file:OptIn(ExperimentalForeignApi::class)
 package io.github.kdroidfilter.composemediaplayer
 
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -37,7 +37,7 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
     }
 
     UIKitView(
-        modifier = modifier,
+        modifier = modifier.aspectRatio(ratio = playerState.videoAspectRatio.toFloat()),
         factory = {
             UIView().apply {
                 backgroundColor = UIColor.blackColor
@@ -62,7 +62,6 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                         avPlayerViewController.view.bottomAnchor.constraintEqualToAnchor(this.bottomAnchor)
                     )
                 )
-
                 println("[VideoPlayerSurface] Vue configurée")
             }
         },
@@ -71,7 +70,7 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
             containerView.layoutIfNeeded()
             avPlayerViewController.view.setFrame(containerView.bounds)
 
-            // Lancement de la lecture si le média est chargé et non déjà en lecture
+            // Démarrer la lecture si le média est chargé et non déjà en lecture
             if (playerState.player != null && playerState.hasMedia && !playerState.isPlaying) {
                 println("[VideoPlayerSurface] Démarrage de la lecture")
                 playerState.play()
