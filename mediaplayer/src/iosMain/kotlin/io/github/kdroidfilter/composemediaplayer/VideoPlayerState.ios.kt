@@ -11,10 +11,23 @@ import platform.darwin.dispatch_get_main_queue
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.vinceglb.filekit.PlatformFile
 
+@OptIn(ExperimentalForeignApi::class)
 @Stable
 actual open class VideoPlayerState {
     // États de base
-    actual var volume: Float = 1.0f
+    private var _volume = mutableStateOf(1.0f)
+
+    actual var volume: Float
+        get() = _volume.value
+        set(value) {
+            _volume.value = value  // L'UI se met à jour immédiatement grâce à mutableStateOf
+            // Si le player est en lecture, appliquer directement la valeur
+            if (_isPlaying) {
+                player?.volume = value
+            }
+        }
+
+
     actual var sliderPos: Float by mutableStateOf(0f) // valeur entre 0 et 1000
     actual var userDragging: Boolean = false
     actual var loop: Boolean = false
@@ -124,9 +137,12 @@ actual open class VideoPlayerState {
             println("[VideoPlayerState] play: player est null")
             return
         }
+        // Appliquer le volume stocké lors de la reprise de la lecture
+        player?.volume = volume
         player?.play()
         _isPlaying = true
     }
+
 
     actual fun pause() {
         println("[VideoPlayerState] pause appelé")
