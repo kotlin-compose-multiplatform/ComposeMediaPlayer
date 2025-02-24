@@ -2,6 +2,7 @@ package sample.app
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,7 +38,9 @@ import io.github.vinceglb.filekit.name
 
 @Composable
 fun App() {
-    MaterialTheme {
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+    ) {
         // Default video URL
         var videoUrl by remember { mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }
         val playerState = rememberVideoPlayerState()
