@@ -32,6 +32,7 @@ import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.util.getUri
+import io.github.kdroidfilter.platformtools.darkmodedetector.isSystemInDarkMode
 import io.github.vinceglb.filekit.dialog.PickerType
 import io.github.vinceglb.filekit.dialog.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
@@ -39,7 +40,7 @@ import io.github.vinceglb.filekit.name
 @Composable
 fun App() {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+        colorScheme = if (isSystemInDarkMode()) darkColorScheme() else lightColorScheme(),
     ) {
         // Default video URL
         var videoUrl by remember { mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }

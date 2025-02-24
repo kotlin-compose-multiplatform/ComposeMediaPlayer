@@ -69,6 +69,7 @@ kotlin {
             implementation(project(":mediaplayer"))
             implementation(compose.materialIconsExtended)
             implementation(libs.filekit.dialog.compose)
+            implementation(libs.platformtools.darkmodedetector)
         }
 
         androidMain.dependencies {
@@ -111,6 +112,11 @@ compose.desktop {
             packageVersion = "1.0.0"
             linux {
                 modules("jdk.security.auth")
+            }
+            macOS {
+                jvmArgs(
+                    "-Dapple.awt.application.appearance=system"
+                )
             }
         }
     }
