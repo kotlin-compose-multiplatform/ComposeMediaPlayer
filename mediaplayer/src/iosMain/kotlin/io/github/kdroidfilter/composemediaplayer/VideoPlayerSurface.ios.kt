@@ -6,11 +6,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
-import platform.AVFoundation.pause
-import platform.AVFoundation.play
 import platform.AVKit.AVPlayerViewController
 import platform.UIKit.*
-import platform.CoreGraphics.CGRectMake
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
