@@ -1,129 +1,154 @@
 @file:OptIn(ExperimentalForeignApi::class)
 package io.github.kdroidfilter.composemediaplayer
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.Stable
-import io.github.kdroidfilter.composemediaplayer.util.formatTime
-import io.github.vinceglb.filekit.PlatformFile
+import androidx.compose.runtime.*
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFoundation.*
 import platform.CoreMedia.*
-import platform.Foundation.NSURL
+import platform.Foundation.*
+import platform.UIKit.*
 import platform.darwin.dispatch_get_main_queue
+import io.github.kdroidfilter.composemediaplayer.util.formatTime
+import io.github.vinceglb.filekit.PlatformFile
 
 @Stable
 actual open class VideoPlayerState {
-    // États basiques
+    // États de base
     actual var volume: Float = 1.0f
-    actual var sliderPos: Float = 0.0f      // Valeur comprise entre 0 et 1 représentant la progression
+    actual var sliderPos: Float by mutableStateOf(0f) // valeur entre 0 et 1000
     actual var userDragging: Boolean = false
     actual var loop: Boolean = false
 
     // États de lecture
     actual val hasMedia: Boolean get() = _hasMedia
     actual val isPlaying: Boolean get() = _isPlaying
-    actual val leftLevel: Float = 0.0f
-    actual val rightLevel: Float = 0.0f
 
-    // Les textes de temps sont exposés en tant que val via des variables d'état privées
+    private var _hasMedia by mutableStateOf(false)
+    private var _isPlaying by mutableStateOf(false)
+
+    // Textes affichant la position et la durée
     private var _positionText: String by mutableStateOf("00:00")
     actual val positionText: String get() = _positionText
-
     private var _durationText: String by mutableStateOf("00:00")
     actual val durationText: String get() = _durationText
 
     actual val isLoading: Boolean = false
     actual val error: VideoPlayerError? = null
 
-    private var _hasMedia = false
-    private var _isPlaying = false
-
-    // Instance observable du player pour Compose
+    // Instance observable du player
     var player: AVPlayer? by mutableStateOf(null)
         private set
 
-    // Token pour l'observateur périodique
+    // Observateur périodique pour mettre à jour le temps
     private var timeObserverToken: Any? = null
 
-    // Métadonnées et sous-titres (non entièrement implémentés ici)
-    actual val metadata: VideoMetadata = VideoMetadata()
-    actual var subtitlesEnabled: Boolean = false
-    actual var currentSubtitleTrack: SubtitleTrack? = null
-    actual val availableSubtitleTracks: MutableList<SubtitleTrack> = mutableListOf()
+    // Valeurs internes de temps (en secondes)
+    private var _currentTime: Double = 0.0
+    private var _duration: Double = 0.0
 
+    // Niveaux audio (non implémentés pour l’instant)
+    actual val leftLevel: Float = 0f
+    actual val rightLevel: Float = 0f
+
+    /**
+     * Démarre un observateur périodique (≈60 fps) pour mettre à jour la progression, la position et la durée.
+     */
+    private fun startPositionUpdates() {
+        stopPositionUpdates() // Nettoyage éventuel d'un observateur existant
+        val interval = CMTimeMakeWithSeconds(1.0 / 60.0, 600) // environ 60fps
+        timeObserverToken = player?.addPeriodicTimeObserverForInterval(
+            interval = interval,
+            queue = dispatch_get_main_queue(),
+            usingBlock = { time ->
+                val currentSeconds = CMTimeGetSeconds(time)
+                val durationSeconds = player?.currentItem?.duration?.let { CMTimeGetSeconds(it) } ?: 0.0
+                _currentTime = currentSeconds
+                _duration = durationSeconds
+
+                if (!userDragging && durationSeconds > 0) {
+                    sliderPos = ((currentSeconds / durationSeconds) * 1000).toFloat()
+                }
+                _positionText = formatTime(currentSeconds.toFloat())
+                _durationText = formatTime(durationSeconds.toFloat())
+
+                // Mode boucle : si la fin est atteinte, revenir au début et relancer la lecture
+                if (loop && durationSeconds > 0 && currentSeconds >= durationSeconds) {
+                    player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
+                    player?.play()
+                }
+            }
+        )
+    }
+
+    private fun stopPositionUpdates() {
+        timeObserverToken?.let { token ->
+            player?.removeTimeObserver(token)
+            timeObserverToken = null
+        }
+    }
+
+    /**
+     * Ouvre une URI vidéo.
+     * Crée un AVPlayer avec un AVPlayerItem, démarre l’observateur et lance la lecture.
+     */
     actual fun openUri(uri: String) {
         println("[VideoPlayerState] openUri appelé avec uri: $uri")
         val nsUrl = NSURL.URLWithString(uri) ?: run {
-            println("[VideoPlayerState] Échec de la création d'NSURL depuis uri: $uri")
+            println("[VideoPlayerState] Échec de création d'NSURL depuis uri: $uri")
             return
         }
-
-        // Nettoyage de l'observateur précédent (s'il existe)
-        removeTimeObserver()
-
-        // Pause et remplacement du player existant
+        // Nettoyage
+        stopPositionUpdates()
         player?.pause()
 
-        // Création du player avec un AVPlayerItem
-        val playerItem = AVPlayerItem(uRL = nsUrl)
+        // Création d'un nouvel AVPlayerItem et AVPlayer
+        val playerItem = AVPlayerItem(nsUrl)
         player = AVPlayer(playerItem = playerItem).apply {
             volume = this@VideoPlayerState.volume
         }
-
-        // Ajout de l'observateur pour la progression
-        addTimeObserver()
-
+        // Démarrer l'observateur et marquer la présence de média
+        startPositionUpdates()
         _hasMedia = true
-        println("[VideoPlayerState] AVPlayer créé avec succès pour uri: $uri")
+        // Lancer la lecture automatiquement
+        play()
     }
 
-    actual fun openFile(file: PlatformFile) {
-        println("[VideoPlayerState] openFile appelé avec file: $file")
-        openUri(file.toString())
-    }
+    /**
+     * Ouvre un fichier vidéo.
+     * La conversion du fichier en URI est effectuée via toString().
+     */
 
     actual fun play() {
         println("[VideoPlayerState] play appelé")
         if (player == null) {
             println("[VideoPlayerState] play: player est null")
-        } else {
-            player?.play()
-            println("[VideoPlayerState] play: lecture démarrée")
+            return
         }
+        player?.play()
         _isPlaying = true
     }
 
     actual fun pause() {
         println("[VideoPlayerState] pause appelé")
-        if (player == null) {
-            println("[VideoPlayerState] pause: player est null")
-        } else {
-            player?.pause()
-            println("[VideoPlayerState] pause: lecture en pause")
-        }
+        player?.pause()
         _isPlaying = false
     }
 
     actual fun stop() {
         println("[VideoPlayerState] stop appelé")
-        if (player == null) {
-            println("[VideoPlayerState] stop: player est null")
-        } else {
-            player?.pause()
-            player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
-            println("[VideoPlayerState] stop: lecture arrêtée et remise au début")
-        }
+        player?.pause()
+        player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
         _isPlaying = false
     }
 
     /**
-     * Déplace la lecture à la position donnée (en secondes).
+     * Recherche la position cible à partir d'une valeur comprise entre 0 et 1000, puis déplace la lecture.
      */
     actual fun seekTo(value: Float) {
-        println("[VideoPlayerState] seekTo appelé avec value: $value")
-        player?.seekToTime(CMTimeMakeWithSeconds(value.toDouble(), 1))
+        if (_duration > 0) {
+            val targetTime = _duration * (value / 1000.0)
+            player?.seekToTime(CMTimeMakeWithSeconds(targetTime, 1))
+        }
     }
 
     actual fun hideMedia() {
@@ -136,82 +161,39 @@ actual open class VideoPlayerState {
         _hasMedia = true
     }
 
+    actual fun clearError() {
+        println("[VideoPlayerState] clearError appelé")
+        // Pas de gestion d'erreur dans cette version de base
+    }
+
     actual fun dispose() {
         println("[VideoPlayerState] dispose appelé")
-        if (player == null) {
-            println("[VideoPlayerState] dispose: player est null")
-        } else {
-            removeTimeObserver()
-            player?.pause()
-            println("[VideoPlayerState] dispose: player en pause et libéré")
-        }
+        stopPositionUpdates()
+        player?.pause()
         player = null
         _hasMedia = false
         _isPlaying = false
     }
 
-    actual fun clearError() {
-        println("[VideoPlayerState] clearError appelé")
-        // Pas de gestion d'erreur dans cette version basique
+    actual fun openFile(file: PlatformFile) {
+        println("[VideoPlayerState] openFile appelé avec file: $file")
+        openUri(file.toString())
     }
 
-    /**
-     * Retourne l'instance du player (utilisé dans la vue Compose).
-     */
-    fun getPlayer(): AVPlayer? {
-        println("[VideoPlayerState] getPlayer appelé, renvoi: $player")
-        return player
-    }
+    actual val metadata: VideoMetadata
+        get() = TODO("Not yet implemented")
+    actual var subtitlesEnabled: Boolean
+        get() = TODO("Not yet implemented")
+        set(value) {}
+    actual var currentSubtitleTrack: SubtitleTrack?
+        get() = TODO("Not yet implemented")
+        set(value) {}
+    actual val availableSubtitleTracks: MutableList<SubtitleTrack>
+        get() = TODO("Not yet implemented")
 
     actual fun selectSubtitleTrack(track: SubtitleTrack?) {
-        currentSubtitleTrack = track
-        println("[VideoPlayerState] Piste de sous-titres sélectionnée: $track")
     }
 
     actual fun disableSubtitles() {
-        subtitlesEnabled = false
-        println("[VideoPlayerState] Sous-titres désactivés")
     }
-
-    // --- Implémentation de l'observateur de temps ---
-    /**
-     * Ajoute un observateur périodique pour mettre à jour la position, la durée et le slider.
-     */
-    private fun addTimeObserver() {
-        val interval = CMTimeMakeWithSeconds(1.0, 1) // intervalle de 1 seconde
-        timeObserverToken = player?.addPeriodicTimeObserverForInterval(
-            interval = interval,
-            queue = dispatch_get_main_queue(),
-            usingBlock = { time ->
-                // Temps actuel et durée totale en secondes
-                val currentSeconds = CMTimeGetSeconds(time)
-                val durationSeconds = player?.currentItem?.duration?.let { CMTimeGetSeconds(it) } ?: 0.0
-
-                // Mise à jour du slider (progression)
-                sliderPos = if (durationSeconds > 0) (currentSeconds / durationSeconds).toFloat() else 0.0f
-
-                // Mise à jour des textes affichant le temps via les variables internes
-                _positionText = formatTime(currentSeconds.toFloat())
-                _durationText = formatTime(durationSeconds.toFloat())
-
-                // Mode boucle : redémarrage si la fin est atteinte
-                if (loop && durationSeconds > 0 && currentSeconds >= durationSeconds) {
-                    player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
-                    player?.play()
-                }
-            }
-        )
-    }
-
-    /**
-     * Supprime l'observateur de temps s'il est actif.
-     */
-    private fun removeTimeObserver() {
-        timeObserverToken?.let { token ->
-            player?.removeTimeObserver(token)
-            timeObserverToken = null
-        }
-    }
-
-
 }

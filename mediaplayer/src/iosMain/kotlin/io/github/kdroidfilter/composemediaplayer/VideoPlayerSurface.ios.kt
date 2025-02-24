@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
+
 package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Composable
@@ -9,19 +11,16 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVKit.AVPlayerViewController
 import platform.UIKit.*
 
-@OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
-    println("[VideoPlayerSurface] Composable called")
-
-    // Remember AVPlayerViewController to prevent recreation on recomposition
+    // Création et mémorisation du AVPlayerViewController
     val avPlayerViewController = remember {
         AVPlayerViewController().apply {
             showsPlaybackControls = true
         }
     }
 
-    // Use DisposableEffect to handle cleanup
+    // Nettoyage lors de la suppression de la vue
     DisposableEffect(Unit) {
         onDispose {
             println("[VideoPlayerSurface] Disposing")
@@ -30,60 +29,51 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
         }
     }
 
-    // Effect to update player when it changes
-    DisposableEffect(playerState.getPlayer()) {
-        println("[VideoPlayerSurface] Player changed to: ${playerState.getPlayer()}")
-        avPlayerViewController.player = playerState.getPlayer()
+    // Mise à jour du player lorsqu'il change
+    DisposableEffect(playerState.player) {
+        println("[VideoPlayerSurface] Player mis à jour")
+        avPlayerViewController.player = playerState.player
         onDispose { }
     }
 
     UIKitView(
         modifier = modifier,
         factory = {
-            println("[VideoPlayerSurface] UIKitView factory called")
-
-            // Create the container view
             UIView().apply {
                 backgroundColor = UIColor.blackColor
-                clipsToBounds = true // Ensure content doesn't overflow
+                clipsToBounds = true
 
-                // Add the AVPlayerViewController's view
+                // Ajout de la vue du AVPlayerViewController
                 avPlayerViewController.view.translatesAutoresizingMaskIntoConstraints = false
                 addSubview(avPlayerViewController.view)
 
-                // Get the root view controller and add the AVPlayerViewController
+                // Récupération du contrôleur racine pour intégrer le AVPlayerViewController
                 UIApplication.sharedApplication.keyWindow?.rootViewController?.let { rootVC ->
                     rootVC.addChildViewController(avPlayerViewController)
                     avPlayerViewController.didMoveToParentViewController(rootVC)
                 }
 
-                // Set up constraints
+                // Contraintes pour que la vue remplisse entièrement le conteneur
                 NSLayoutConstraint.activateConstraints(
                     listOf(
-                        avPlayerViewController.view.topAnchor.constraintEqualToAnchor(topAnchor),
-                        avPlayerViewController.view.leadingAnchor.constraintEqualToAnchor(leadingAnchor),
-                        avPlayerViewController.view.trailingAnchor.constraintEqualToAnchor(trailingAnchor),
-                        avPlayerViewController.view.bottomAnchor.constraintEqualToAnchor(bottomAnchor)
+                        avPlayerViewController.view.topAnchor.constraintEqualToAnchor(this.topAnchor),
+                        avPlayerViewController.view.leadingAnchor.constraintEqualToAnchor(this.leadingAnchor),
+                        avPlayerViewController.view.trailingAnchor.constraintEqualToAnchor(this.trailingAnchor),
+                        avPlayerViewController.view.bottomAnchor.constraintEqualToAnchor(this.bottomAnchor)
                     )
                 )
 
-                println("[VideoPlayerSurface] View setup completed")
+                println("[VideoPlayerSurface] Vue configurée")
             }
         },
         update = { containerView ->
-            println("[VideoPlayerSurface] UIKitView update called")
-
-            // Force layout update
             containerView.setNeedsLayout()
             containerView.layoutIfNeeded()
-
-            // Ensure the AVPlayerViewController view fills the container
             avPlayerViewController.view.setFrame(containerView.bounds)
 
-            // Start playback if we have a player and should be playing
-            val player = playerState.getPlayer()
-            if (player != null && playerState.hasMedia && !playerState.isPlaying) {
-                println("[VideoPlayerSurface] Starting playback")
+            // Lancement de la lecture si le média est chargé et non déjà en lecture
+            if (playerState.player != null && playerState.hasMedia && !playerState.isPlaying) {
+                println("[VideoPlayerSurface] Démarrage de la lecture")
                 playerState.play()
             }
         }
