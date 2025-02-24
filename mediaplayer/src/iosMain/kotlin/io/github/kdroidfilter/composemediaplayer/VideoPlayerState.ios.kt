@@ -16,17 +16,14 @@ import io.github.vinceglb.filekit.PlatformFile
 actual open class VideoPlayerState {
     // États de base
     private var _volume = mutableStateOf(1.0f)
-
     actual var volume: Float
         get() = _volume.value
         set(value) {
-            _volume.value = value  // L'UI se met à jour immédiatement grâce à mutableStateOf
-            // Si le player est en lecture, appliquer directement la valeur
+            _volume.value = value
             if (_isPlaying) {
                 player?.volume = value
             }
         }
-
 
     actual var sliderPos: Float by mutableStateOf(0f) // valeur entre 0 et 1000
     actual var userDragging: Boolean = false
@@ -35,7 +32,6 @@ actual open class VideoPlayerState {
     // États de lecture
     actual val hasMedia: Boolean get() = _hasMedia
     actual val isPlaying: Boolean get() = _isPlaying
-
     private var _hasMedia by mutableStateOf(false)
     private var _isPlaying by mutableStateOf(false)
 
@@ -52,8 +48,11 @@ actual open class VideoPlayerState {
     var player: AVPlayer? by mutableStateOf(null)
         private set
 
-    // Observateur périodique pour mettre à jour le temps
+    // Observateur périodique pour mettre à jour la position (≈60 fps)
     private var timeObserverToken: Any? = null
+
+    // Observateur pour la notification de fin de lecture
+    private var endObserver: Any? = null
 
     // Valeurs internes de temps (en secondes)
     private var _currentTime: Double = 0.0
@@ -64,10 +63,10 @@ actual open class VideoPlayerState {
     actual val rightLevel: Float = 0f
 
     /**
-     * Démarre un observateur périodique (≈60 fps) pour mettre à jour la progression, la position et la durée.
+     * Démarre un observateur périodique pour mettre à jour la progression.
      */
     private fun startPositionUpdates() {
-        stopPositionUpdates() // Nettoyage éventuel d'un observateur existant
+        stopPositionUpdates() // Nettoyage d'un observateur existant
         val interval = CMTimeMakeWithSeconds(1.0 / 60.0, 600) // environ 60fps
         timeObserverToken = player?.addPeriodicTimeObserverForInterval(
             interval = interval,
@@ -83,12 +82,6 @@ actual open class VideoPlayerState {
                 }
                 _positionText = formatTime(currentSeconds.toFloat())
                 _durationText = formatTime(durationSeconds.toFloat())
-
-                // Mode boucle : si la fin est atteinte, revenir au début et relancer la lecture
-                if (loop && durationSeconds > 0 && currentSeconds >= durationSeconds) {
-                    player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
-                    player?.play()
-                }
             }
         )
     }
@@ -101,8 +94,18 @@ actual open class VideoPlayerState {
     }
 
     /**
+     * Supprime l'observateur de notification de fin de lecture.
+     */
+    private fun removeEndObserver() {
+        endObserver?.let {
+            NSNotificationCenter.defaultCenter.removeObserver(it)
+            endObserver = null
+        }
+    }
+
+    /**
      * Ouvre une URI vidéo.
-     * Crée un AVPlayer avec un AVPlayerItem, démarre l’observateur et lance la lecture.
+     * Crée un AVPlayer avec un AVPlayerItem, démarre les observateurs et lance la lecture.
      */
     actual fun openUri(uri: String) {
         println("[VideoPlayerState] openUri appelé avec uri: $uri")
@@ -110,46 +113,70 @@ actual open class VideoPlayerState {
             println("[VideoPlayerState] Échec de création d'NSURL depuis uri: $uri")
             return
         }
-        // Nettoyage
+
+        // Nettoyage d'un média précédent
         stopPositionUpdates()
+        removeEndObserver()
         player?.pause()
 
         // Création d'un nouvel AVPlayerItem et AVPlayer
         val playerItem = AVPlayerItem(nsUrl)
         player = AVPlayer(playerItem = playerItem).apply {
             volume = this@VideoPlayerState.volume
+            // On désactive l'action par défaut à la fin pour gérer nous-mêmes le comportement
+            actionAtItemEnd = AVPlayerActionAtItemEndNone
         }
-        // Démarrer l'observateur et marquer la présence de média
+
+        // Ajouter l'observateur pour détecter la fin du média et gérer le comportement en fonction du loop
+        endObserver = NSNotificationCenter.defaultCenter.addObserverForName(
+            name = AVPlayerItemDidPlayToEndTimeNotification,
+            `object` = player?.currentItem,
+            queue = null
+        ) { notification ->
+            if (loop) {
+                player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
+                player?.play()
+            } else {
+                // Si le loop est désactivé, on met en pause pour arrêter la lecture
+                player?.pause()
+                _isPlaying = false
+            }
+        }
+
+        // Démarrer l'observateur de position et marquer la présence d'un média
         startPositionUpdates()
         _hasMedia = true
+
         // Lancer la lecture automatiquement
         play()
     }
 
     /**
-     * Ouvre un fichier vidéo.
-     * La conversion du fichier en URI est effectuée via toString().
+     * Démarre la lecture.
      */
-
     actual fun play() {
         println("[VideoPlayerState] play appelé")
         if (player == null) {
             println("[VideoPlayerState] play: player est null")
             return
         }
-        // Appliquer le volume stocké lors de la reprise de la lecture
         player?.volume = volume
         player?.play()
         _isPlaying = true
     }
 
-
+    /**
+     * Met en pause la lecture.
+     */
     actual fun pause() {
         println("[VideoPlayerState] pause appelé")
         player?.pause()
         _isPlaying = false
     }
 
+    /**
+     * Arrête la lecture et revient au début.
+     */
     actual fun stop() {
         println("[VideoPlayerState] stop appelé")
         player?.pause()
@@ -158,7 +185,7 @@ actual open class VideoPlayerState {
     }
 
     /**
-     * Recherche la position cible à partir d'une valeur comprise entre 0 et 1000, puis déplace la lecture.
+     * Recherche la position cible à partir d'une valeur entre 0 et 1000, puis déplace la lecture.
      */
     actual fun seekTo(value: Float) {
         if (_duration > 0) {
@@ -167,35 +194,52 @@ actual open class VideoPlayerState {
         }
     }
 
+    /**
+     * Cache le média.
+     */
     actual fun hideMedia() {
         println("[VideoPlayerState] hideMedia appelé")
         _hasMedia = false
     }
 
+    /**
+     * Affiche le média.
+     */
     actual fun showMedia() {
         println("[VideoPlayerState] showMedia appelé")
         _hasMedia = true
     }
 
+    /**
+     * Efface l'erreur (non implémenté dans cette version).
+     */
     actual fun clearError() {
         println("[VideoPlayerState] clearError appelé")
-        // Pas de gestion d'erreur dans cette version de base
     }
 
+    /**
+     * Libère les ressources et arrête tous les observateurs.
+     */
     actual fun dispose() {
         println("[VideoPlayerState] dispose appelé")
         stopPositionUpdates()
+        removeEndObserver()
         player?.pause()
         player = null
         _hasMedia = false
         _isPlaying = false
     }
 
+    /**
+     * Ouvre un fichier vidéo.
+     * La conversion du fichier en URI se fait via toString().
+     */
     actual fun openFile(file: PlatformFile) {
         println("[VideoPlayerState] openFile appelé avec file: $file")
         openUri(file.toString())
     }
 
+    // Propriétés et méthodes non implémentées
     actual val metadata: VideoMetadata
         get() = TODO("Not yet implemented")
     actual var subtitlesEnabled: Boolean
