@@ -48,7 +48,11 @@ actual open class VideoPlayerState {
     private var _durationText: String by mutableStateOf("00:00")
     actual val durationText: String get() = _durationText
 
-    actual val isLoading: Boolean = false
+    // Mise à jour du isLoading
+    private var _isLoading by mutableStateOf(false)
+    actual val isLoading: Boolean
+        get() = _isLoading
+
     actual val error: VideoPlayerError? = null
 
     // Instance observable du player
@@ -75,12 +79,8 @@ actual open class VideoPlayerState {
         get() = _videoAspectRatio
 
     /**
-     * Démarre un observateur périodique pour mettre à jour la progression et l'aspect ratio.
-     *
-     * Ici, en plus de mettre à jour la position de lecture, on vérifie régulièrement
-     * la propriété `presentationSize` de l’item courant et on met à jour le rapport d’aspect
-     * si besoin. Ainsi, dès que la taille réelle de la vidéo est connue ou change,
-     * l’interface sera recomposée avec le bon aspect ratio.
+     * Démarre un observateur périodique pour mettre à jour la progression, l'aspect ratio
+     * et l'état de buffering (isLoading).
      */
     private fun startPositionUpdates() {
         stopPositionUpdates() // Nettoyage d'un observateur existant
@@ -107,6 +107,16 @@ actual open class VideoPlayerState {
                     if (newAspect != _videoAspectRatio) {
                         _videoAspectRatio = newAspect
                     }
+                }
+
+                // Vérification de l'état de buffering : si le tampon est vide ou si la lecture n'est pas jugée fluide,
+                // alors on considère que la vidéo est en chargement.
+                player?.currentItem?.let { item ->
+                    val isBufferEmpty = item.playbackBufferEmpty
+                    val isLikelyToKeepUp = item.playbackLikelyToKeepUp
+                    _isLoading = isBufferEmpty || !isLikelyToKeepUp
+                } ?: run {
+                    _isLoading = false
                 }
             }
         )
@@ -195,6 +205,8 @@ actual open class VideoPlayerState {
         player?.volume = volume
         player?.play()
         _isPlaying = true
+        // Lors du lancement de la lecture, on considère que le buffering est terminé
+        _isLoading = false
     }
 
     /**
@@ -289,3 +301,4 @@ actual open class VideoPlayerState {
     actual fun disableSubtitles() {
     }
 }
+
