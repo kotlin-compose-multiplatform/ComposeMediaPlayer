@@ -60,6 +60,7 @@ kotlin {
             api(libs.filekit.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlin.logging)
+            implementation("co.touchlab:kermit:2.0.4")
         }
 
         commonTest.dependencies {

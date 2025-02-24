@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
+import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVKit.AVPlayerViewController
 import platform.UIKit.*
@@ -18,25 +19,25 @@ import platform.UIKit.*
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier) {
-    // Création et mémorisation du AVPlayerViewController
+    // Create and store the AVPlayerViewController
     val avPlayerViewController = remember {
         AVPlayerViewController().apply {
             showsPlaybackControls = false
         }
     }
 
-    // Nettoyage lors de la suppression de la vue
+    // Cleanup when deleting the view
     DisposableEffect(Unit) {
         onDispose {
-            println("[VideoPlayerSurface] Disposing")
+            Logger.d { "[VideoPlayerSurface] Disposing" }
             playerState.pause()
             avPlayerViewController.removeFromParentViewController()
         }
     }
 
-    // Mise à jour du player lorsqu'il change
+    // Update the player when it changes
     DisposableEffect(playerState.player) {
-        println("[VideoPlayerSurface] Player mis à jour")
+        Logger.d{"Video Player updated"}
         avPlayerViewController.player = playerState.player
         onDispose { }
     }
@@ -69,20 +70,20 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                                 avPlayerViewController.view.bottomAnchor.constraintEqualToAnchor(this.bottomAnchor)
                             )
                         )
-                        println("[VideoPlayerSurface] Vue configurée")
+                        Logger.d { "View configurated" }
                     }
                 },
                 update = { containerView ->
-                    // Masquer ou afficher la vue en fonction de la présence d'un média
+                    // Hide or show the view depending on the presence of media
                     containerView.hidden = !playerState.hasMedia
 
                     containerView.setNeedsLayout()
                     containerView.layoutIfNeeded()
                     avPlayerViewController.view.setFrame(containerView.bounds)
 
-                    // Démarrer la lecture si le média est chargé et non déjà en lecture
+                    // Start playback if media is loaded and not already playing
                     if (playerState.player != null && playerState.hasMedia && !playerState.isPlaying) {
-                        println("[VideoPlayerSurface] Démarrage de la lecture")
+                        Logger.d { "Starting playback" }
                         playerState.play()
                     }
                 }

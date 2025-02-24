@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import co.touchlab.kermit.Logger
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.vinceglb.filekit.PlatformFile
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -17,6 +18,7 @@ import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSURL
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
+
 
 @OptIn(ExperimentalForeignApi::class)
 @Stable
@@ -133,9 +135,9 @@ actual open class VideoPlayerState {
     }
 
     actual fun openUri(uri: String) {
-        println("[VideoPlayerState] openUri called with uri: $uri")
+        Logger.d { "openUri called with uri: $uri" }
         val nsUrl = NSURL.URLWithString(uri) ?: run {
-            println("[VideoPlayerState] Failed to create NSURL from uri: $uri")
+            Logger.d { "Failed to create NSURL from uri: $uri" }
             return
         }
 
@@ -177,10 +179,10 @@ actual open class VideoPlayerState {
     }
 
     actual fun play() {
-        println("[VideoPlayerState] play called")
+        Logger.d { "play called" }
         userInitiatedPause = false
         if (player == null) {
-            println("[VideoPlayerState] play: player is null")
+            Logger.d { "play: player is null" }
             return
         }
         player?.volume = volume
@@ -191,7 +193,7 @@ actual open class VideoPlayerState {
     }
 
     actual fun pause() {
-        println("[VideoPlayerState] pause called")
+        Logger.d { "pause called" }
         userInitiatedPause = true
         // Ensure the pause call is on the main thread:
         dispatch_async(dispatch_get_main_queue()) {
@@ -201,7 +203,7 @@ actual open class VideoPlayerState {
     }
 
     actual fun stop() {
-        println("[VideoPlayerState] stop called")
+        Logger.d { "stop called" }
         player?.pause()
         player?.seekToTime(CMTimeMakeWithSeconds(0.0, 1))
         _isPlaying = false
@@ -216,21 +218,21 @@ actual open class VideoPlayerState {
     }
 
     actual fun hideMedia() {
-        println("[VideoPlayerState] hideMedia called")
+        Logger.d { "hideMedia called" }
         _hasMedia = false
     }
 
     actual fun showMedia() {
-        println("[VideoPlayerState] showMedia called")
+        Logger.d { "showMedia called" }
         _hasMedia = true
     }
 
     actual fun clearError() {
-        println("[VideoPlayerState] clearError called")
+        Logger.d { "clearError called" }
     }
 
     actual fun dispose() {
-        println("[VideoPlayerState] dispose called")
+        Logger.d { "dispose called" }
         stopPositionUpdates()
         removeEndObserver()
         player?.pause()
@@ -240,7 +242,7 @@ actual open class VideoPlayerState {
     }
 
     actual fun openFile(file: PlatformFile) {
-        println("[VideoPlayerState] openFile called with file: $file")
+        Logger.d { "openFile called with file: $file" }
         openUri(file.toString())
     }
 
