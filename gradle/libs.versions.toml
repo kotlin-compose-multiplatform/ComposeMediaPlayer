@@ -15,7 +15,7 @@ compose = "1.7.3"
 androidx-activityCompose = "1.10.0"
 media3Exoplayer = "1.5.1"
 jna = "5.16.0"
-slf4jSimple = "2.0.16"
+slf4jSimple = "2.0.17"
 
 
 [libraries]
