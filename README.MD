@@ -45,17 +45,6 @@ dependencies {
 ```
 
 > [!IMPORTANT]
->It is necessary (for now) to add the following Maven repository to your dependencies because Compose Media Player relies on a snapshot version of the [FileKt core](https://github.com/vinceglb/FileKit/tree/main/filekit-core):
-
-```kotlin
-repositories {
-    maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
-}
-```
-
-For more information, visit: [FileKt on GitHub](https://github.com/vinceglb/FileKit/)
-
-> [!IMPORTANT]
 > Currently, you also need to manually include JavaFX dependencies if your application is also intended for macOS.
 
 ```kotlin
@@ -121,8 +110,14 @@ You can play a video by providing a direct URL:
 playerState.openUri("http://example.com/video.mp4")
 ```
 
-To play a local video file, please refer to [example](sample/composeApp/src/commonMain/kotlin/sample/app/App.kt) using [FileKt](https://github.com/vinceglb/FileKit).
+To play a local video file you can use [PlatformFile](https://filekit.mintlify.app/core/platform-file) from [FileKit](https://github.com/vinceglb/FileKit).
 
+```kotlin
+val file = FileKit.openFilePicker(type = FileKitType.Video)
+file?.let { playerState.openFile(file) }
+```
+
+Check the [sample project](sample/composeApp/src/commonMain/kotlin/sample/app/App.kt) for a complete example.
 
 ### Full Controls
 
