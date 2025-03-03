@@ -31,8 +31,8 @@ import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.rememberVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.util.getUri
-import io.github.vinceglb.filekit.dialog.PickerType
-import io.github.vinceglb.filekit.dialog.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 
 @Composable
@@ -48,7 +48,7 @@ fun App() {
 
         // Launcher for selecting a local video file
         val videoFileLauncher = rememberFilePickerLauncher(
-            type = PickerType.Video,
+            type = FileKitType.Video,
             title = "Select a video"
         ) { file ->
             file?.let {
@@ -58,13 +58,13 @@ fun App() {
 
         // Launcher for selecting a local subtitle file (VTT format)
         val subtitleFileLauncher = rememberFilePickerLauncher(
-            type = PickerType.File(extensions = listOf("vtt")),
+            type = FileKitType.File("vtt"),
             title = "Select a subtitle file"
         ) { file ->
             file?.let {
                 val subtitleUri = it.getUri()
                 val track = SubtitleTrack(
-                    label = it.name ?: "Local",
+                    label = it.name,
                     language = "en",
                     src = subtitleUri
                 )
