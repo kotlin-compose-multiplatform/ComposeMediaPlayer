@@ -4,6 +4,7 @@ androidcontextprovider = "1.0.1"
 filekit = "0.10.0-beta01"
 gst1JavaCore = "1.4.0"
 gst1JavaSwing = "0.9.0"
+kermit = "2.0.4"
 kotlin = "2.1.20"
 agp = "8.7.3"
 kotlinLogging = "7.0.5"
@@ -15,6 +16,7 @@ compose = "1.7.3"
 androidx-activityCompose = "1.10.1"
 media3Exoplayer = "1.5.1"
 jna = "5.17.0"
+platformtoolsDarkmodedetector = "0.2.9"
 slf4jSimple = "2.0.17"
 
 
@@ -27,6 +29,7 @@ filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "file
 filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
 gst1-java-core = { module = "org.freedesktop.gstreamer:gst1-java-core", version.ref = "gst1JavaCore" }
 gst1-java-swing = { module = "org.freedesktop.gstreamer:gst1-java-swing", version.ref = "gst1JavaSwing" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinLogging" }
 kotlinx-browser-wasm-js = { module = "org.jetbrains.kotlinx:kotlinx-browser-wasm-js", version.ref = "kotlinxBrowserWasmJs" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -46,6 +49,7 @@ ktor-client-winhttp = { module = "io.ktor:ktor-client-winhttp", version.ref = "k
 androidx-activityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+platformtools-darkmodedetector = { module = "io.github.kdroidfilter:platformtools.darkmodedetector", version.ref = "platformtoolsDarkmodedetector" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
 
 [plugins]
