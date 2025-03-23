@@ -131,7 +131,7 @@ class SharedVideoPlayer {
             }
         }()
 
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
 
         // Detect video frame rate
         detectVideoFrameRate(from: asset)
@@ -185,7 +185,7 @@ class SharedVideoPlayer {
 
     /// Captures initial frame to display without starting the display link
     private func captureInitialFrame() {
-        guard let output = videoOutput, let item = player?.currentItem else { return }
+        guard let output = videoOutput, let _ = player?.currentItem else { return }
 
         // Seek to the beginning to ensure we have a frame
         let zeroTime = CMTime.zero
