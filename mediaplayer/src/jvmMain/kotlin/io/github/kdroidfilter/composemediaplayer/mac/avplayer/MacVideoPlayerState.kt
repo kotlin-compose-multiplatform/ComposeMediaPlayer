@@ -276,9 +276,18 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
      * Checks if looping is enabled and restarts the video if needed.
      */
     private fun checkLooping(current: Double, duration: Double) {
-        if (loop && current >= duration - 0.5) {
-            macLogger.d { "checkLooping() - Loop enabled, restarting video" }
-            playerScope.launch { seekTo(0f) }
+        if (current >= duration - 0.5) {
+            if (loop) {
+                macLogger.d { "checkLooping() - Loop enabled, restarting video" }
+                playerScope.launch { seekTo(0f) }
+            } else {
+                macLogger.d { "checkLooping() - Video completed, updating state" }
+                isPlaying = false
+                // Update native player state to ensure consistency
+                playerPtr?.let {
+                    SharedVideoPlayer.INSTANCE.pauseVideo(it)
+                }
+            }
         }
     }
 
