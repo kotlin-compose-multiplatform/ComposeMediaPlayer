@@ -19,6 +19,8 @@ internal interface SharedVideoPlayer : Library {
     fun openUri(context: Pointer?, uri: String?)
     fun playVideo(context: Pointer?)
     fun pauseVideo(context: Pointer?)
+    fun setVolume(context: Pointer?, volume: Float)
+    fun getVolume(context: Pointer?): Float
     fun getLatestFrame(context: Pointer?): Pointer?
     fun getFrameWidth(context: Pointer?): Int
     fun getFrameHeight(context: Pointer?): Int
@@ -129,6 +131,20 @@ class VideoPlayerComponent : JPanel() {
      */
     fun pause() {
         playerPtr?.let { SharedVideoPlayer.INSTANCE.pauseVideo(it) }
+    }
+
+    /**
+     * Sets the audio volume (0.0 to 1.0).
+     */
+    fun setVolume(volume: Float) {
+        playerPtr?.let { SharedVideoPlayer.INSTANCE.setVolume(it, volume) }
+    }
+
+    /**
+     * Gets the current audio volume (0.0 to 1.0).
+     */
+    fun getVolume(): Float {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getVolume(it) } ?: 1.0f
     }
 
     /**

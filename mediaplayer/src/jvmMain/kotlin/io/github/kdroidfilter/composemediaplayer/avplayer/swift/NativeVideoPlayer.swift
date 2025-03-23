@@ -22,6 +22,9 @@ class SharedVideoPlayer {
     private var frameWidth: Int = 0
     private var frameHeight: Int = 0
 
+    // Audio volume control (0.0 to 1.0)
+    private var volume: Float = 1.0
+
     init() {}
 
     /// Opens the video from the given URI (local or network)
@@ -74,6 +77,9 @@ class SharedVideoPlayer {
             item.add(output)
         }
         player = AVPlayer(playerItem: item)
+
+        // Set initial volume
+        player?.volume = volume
 
         // Start display link for frame capture
         startDisplayLink()
@@ -150,6 +156,17 @@ class SharedVideoPlayer {
     func pause() {
         player?.pause()
         stopDisplayLink()
+    }
+
+    /// Sets the volume level (0.0 to 1.0)
+    func setVolume(level: Float) {
+        volume = max(0.0, min(1.0, level)) // Clamp between 0.0 and 1.0
+        player?.volume = volume
+    }
+
+    /// Gets the current volume level (0.0 to 1.0)
+    func getVolume() -> Float {
+        return volume
     }
 
     /// Returns a pointer to the shared frame buffer. The caller should not free this pointer.
@@ -230,6 +247,22 @@ public func pauseVideo(_ context: UnsafeMutableRawPointer?) {
     DispatchQueue.main.async {
         player.pause()
     }
+}
+
+@_cdecl("setVolume")
+public func setVolume(_ context: UnsafeMutableRawPointer?, _ volume: Float) {
+    guard let context = context else { return }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    DispatchQueue.main.async {
+        player.setVolume(level: volume)
+    }
+}
+
+@_cdecl("getVolume")
+public func getVolume(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getVolume()
 }
 
 @_cdecl("getLatestFrame")
