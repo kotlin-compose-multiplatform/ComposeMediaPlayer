@@ -2,12 +2,10 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerSurface
-import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerSurface
+import io.github.kdroidfilter.composemediaplayer.mac.compose.MacVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.mac.compose.MacVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerSurface
 

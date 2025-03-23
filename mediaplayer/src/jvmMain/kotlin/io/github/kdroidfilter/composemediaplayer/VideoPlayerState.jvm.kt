@@ -2,10 +2,8 @@ package io.github.kdroidfilter.composemediaplayer
 
 import androidx.compose.runtime.Stable
 import com.sun.jna.Platform
-import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerState
-import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerSurface
+import io.github.kdroidfilter.composemediaplayer.mac.compose.MacVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
 import io.github.vinceglb.filekit.PlatformFile
 

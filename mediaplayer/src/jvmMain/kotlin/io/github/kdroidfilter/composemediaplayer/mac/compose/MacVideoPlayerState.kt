@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.mac.avplayer
+package io.github.kdroidfilter.composemediaplayer.mac.compose
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -14,6 +14,7 @@ import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
+import io.github.kdroidfilter.composemediaplayer.mac.SharedVideoPlayer
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow

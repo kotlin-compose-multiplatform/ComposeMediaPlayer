@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.mac.avplayer
+package io.github.kdroidfilter.composemediaplayer.mac
 
 import com.sun.jna.Library
 import com.sun.jna.Native

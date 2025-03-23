@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.mac.avplayer
+package io.github.kdroidfilter.composemediaplayer.mac.compose
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
