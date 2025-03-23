@@ -135,7 +135,21 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         playerScope.launch {
             try {
                 isLoading = true
-                stopFrameUpdates()
+
+                // First, properly stop any current playback
+                if (hasMedia) {
+                    pause()  // Stop the current audio playback
+                    stopFrameUpdates()
+
+                    // Dispose the current player instance
+                    playerPtr?.let {
+                        macLogger.d { "disposing previous player before opening new URI" }
+                        SharedVideoPlayer.INSTANCE.disposeVideoPlayer(it)
+                        playerPtr = null
+                    }
+                }
+
+                // Now initialize a new player
                 initPlayer()
 
                 withContext(Dispatchers.IO) {
