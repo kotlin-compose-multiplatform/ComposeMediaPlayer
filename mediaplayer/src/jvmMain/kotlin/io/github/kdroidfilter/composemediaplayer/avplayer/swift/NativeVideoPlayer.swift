@@ -11,7 +11,7 @@ class SharedVideoPlayer {
     // Timer ~60fps
     var timer: Timer?
 
-    // Shared buffer to store the frame in BGRA format (no conversion necessary)
+    // Shared buffer to store the frame in BGRA format (no conversion needed)
     var frameBuffer: UnsafeMutablePointer<UInt32>?
 
     // Frame dimensions
@@ -32,7 +32,7 @@ class SharedVideoPlayer {
 
         let asset = AVAsset(url: url)
 
-        // Retrieve the video track to obtain the effective dimensions
+        // Retrieve the video track to obtain the actual dimensions
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
             print("Video track not found")
             return
@@ -52,7 +52,7 @@ class SharedVideoPlayer {
         frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
         frameBuffer?.initialize(repeating: 0, count: totalPixels)
 
-        // Create the attributes for the CVPixelBuffer (BGRA format)
+        // Create attributes for the CVPixelBuffer (BGRA format)
         let pixelBufferAttributes: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: frameWidth,
@@ -84,7 +84,7 @@ class SharedVideoPlayer {
         }
     }
 
-    /// Directly copies the content of the pixelBuffer into the shared buffer without any conversion.
+    /// Directly copies the content of the pixelBuffer into the shared buffer without conversion.
     func updateLatestFrameData(from pixelBuffer: CVPixelBuffer) {
         guard let destBuffer = frameBuffer else { return }
 
@@ -97,11 +97,10 @@ class SharedVideoPlayer {
         let srcBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
 
         guard width == frameWidth, height == frameHeight else {
-            print("Unexpected frame dimensions: \(width)x\(height)")
+            print("Unexpected dimensions: \(width)x\(height)")
             return
         }
 
-        // If the stride matches width * 4, perform a direct copy, otherwise copy line by line
         if srcBytesPerRow == width * 4 {
             memcpy(destBuffer, srcBaseAddress, height * srcBytesPerRow)
         } else {
@@ -121,13 +120,32 @@ class SharedVideoPlayer {
         player?.pause()
     }
 
-    /// Returns a pointer to the shared buffer. The caller **must not free** this pointer.
+    /// Returns a pointer to the shared buffer. The caller should not free this pointer.
     func getLatestFramePointer() -> UnsafeMutablePointer<UInt32>? {
         return frameBuffer
     }
 
     func getFrameWidth() -> Int { frameWidth }
     func getFrameHeight() -> Int { frameHeight }
+
+    /// Returns the duration of the video in seconds.
+    func getDuration() -> Double {
+        guard let item = player?.currentItem else { return 0 }
+        return CMTimeGetSeconds(item.asset.duration)
+    }
+
+    /// Returns the current playback time in seconds.
+    func getCurrentTime() -> Double {
+        guard let item = player?.currentItem else { return 0 }
+        return CMTimeGetSeconds(item.currentTime())
+    }
+
+    /// Seeks to the specified time (in seconds).
+    func seekTo(time: Double) {
+        guard let player = player else { return }
+        let newTime = CMTime(seconds: time, preferredTimescale: 600)
+        player.seek(to: newTime)
+    }
 
     func dispose() {
         player?.pause()
@@ -142,7 +160,7 @@ class SharedVideoPlayer {
     }
 }
 
-/// MARK: - C Functions Exported for JNA
+/// MARK: - C Exported Functions for JNA
 
 @_cdecl("createVideoPlayer")
 public func createVideoPlayer() -> UnsafeMutableRawPointer? {
@@ -204,6 +222,29 @@ public func getFrameHeight(_ context: UnsafeMutableRawPointer?) -> Int32 {
     guard let context = context else { return 0 }
     let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
     return Int32(player.getFrameHeight())
+}
+
+@_cdecl("getVideoDuration")
+public func getVideoDuration(_ context: UnsafeMutableRawPointer?) -> Double {
+    guard let context = context else { return 0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getDuration()
+}
+
+@_cdecl("getCurrentTime")
+public func getCurrentTime(_ context: UnsafeMutableRawPointer?) -> Double {
+    guard let context = context else { return 0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getCurrentTime()
+}
+
+@_cdecl("seekTo")
+public func seekTo(_ context: UnsafeMutableRawPointer?, _ time: Double) {
+    guard let context = context else { return }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    DispatchQueue.main.async {
+        player.seekTo(time: time)
+    }
 }
 
 @_cdecl("disposeVideoPlayer")

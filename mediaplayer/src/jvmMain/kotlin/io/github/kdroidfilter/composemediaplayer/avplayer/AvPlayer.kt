@@ -12,7 +12,7 @@ import java.nio.IntBuffer
 import javax.swing.*
 
 /**
- * JNA Interface to the native library.
+ * JNA interface to the native library.
  */
 internal interface SharedVideoPlayer : Library {
     fun createVideoPlayer(): Pointer?
@@ -22,6 +22,9 @@ internal interface SharedVideoPlayer : Library {
     fun getLatestFrame(context: Pointer?): Pointer?
     fun getFrameWidth(context: Pointer?): Int
     fun getFrameHeight(context: Pointer?): Int
+    fun getVideoDuration(context: Pointer?): Double
+    fun getCurrentTime(context: Pointer?): Double
+    fun seekTo(context: Pointer?, time: Double)
     fun disposeVideoPlayer(context: Pointer?)
 
     companion object {
@@ -36,7 +39,7 @@ internal interface SharedVideoPlayer : Library {
 class VideoPlayerComponent : JPanel() {
     private var playerPtr: Pointer? = null
     private var bufferedImage: BufferedImage? = null
-    private var timer: Timer? = null
+    private var frameTimer: Timer? = null
 
     init {
         background = Color.BLACK
@@ -51,19 +54,20 @@ class VideoPlayerComponent : JPanel() {
     }
 
     override fun removeNotify() {
-        timer?.stop()
+        frameTimer?.stop()
         disposePlayer()
         super.removeNotify()
     }
 
     private fun initPlayer() {
-        println("Initializing native VideoPlayer with shared buffer...")
+        println("Initializing the native VideoPlayer with shared buffer...")
         playerPtr = SharedVideoPlayer.INSTANCE.createVideoPlayer()
         if (playerPtr != null) {
-            timer = Timer(16) { updateFrame() }
-            timer?.start()
+            // Timer to refresh images (~60 fps)
+            frameTimer = Timer(16) { updateFrame() }
+            frameTimer?.start()
         } else {
-            System.err.println("Failed to create native video player.")
+            System.err.println("Failed to create the native video player.")
         }
     }
 
@@ -100,6 +104,9 @@ class VideoPlayerComponent : JPanel() {
         }
     }
 
+    /**
+     * Opens a media via its URI (local or URL).
+     */
     fun openMedia(uri: String) {
         if (playerPtr == null) {
             initPlayer()
@@ -110,12 +117,39 @@ class VideoPlayerComponent : JPanel() {
         SharedVideoPlayer.INSTANCE.openUri(playerPtr, uri)
     }
 
+    /**
+     * Starts playback.
+     */
     fun play() {
         playerPtr?.let { SharedVideoPlayer.INSTANCE.playVideo(it) }
     }
 
+    /**
+     * Pauses playback.
+     */
     fun pause() {
         playerPtr?.let { SharedVideoPlayer.INSTANCE.pauseVideo(it) }
+    }
+
+    /**
+     * Returns the video duration in seconds.
+     */
+    fun getDuration(): Double {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getVideoDuration(it) } ?: 0.0
+    }
+
+    /**
+     * Returns the current playback time in seconds.
+     */
+    fun getCurrentTime(): Double {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getCurrentTime(it) } ?: 0.0
+    }
+
+    /**
+     * Seeks to the specified time (in seconds).
+     */
+    fun seekTo(time: Double) {
+        playerPtr?.let { SharedVideoPlayer.INSTANCE.seekTo(it, time) }
     }
 
     private fun disposePlayer() {
@@ -126,4 +160,3 @@ class VideoPlayerComponent : JPanel() {
         }
     }
 }
-
