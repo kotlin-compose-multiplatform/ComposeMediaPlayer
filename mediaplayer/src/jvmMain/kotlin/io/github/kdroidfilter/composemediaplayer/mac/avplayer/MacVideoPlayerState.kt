@@ -83,7 +83,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     private val updateInterval: Long
         get() = if (captureFrameRate > 0) (1000.0f / captureFrameRate).toLong() else 33L
 
-    private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     init {
         println("Initializing video player")
@@ -121,15 +121,18 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     override fun openUri(uri: String) {
         println("openUri() - Opening URI: $uri")
+        // Recréer le playerScope s'il a été annulé
+        if (!playerScope.isActive) {
+            println("Recréer un nouveau playerScope")
+            playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        }
         playerScope.launch {
             try {
                 isLoading = true
-                println("openUri() - isLoading set to true")
                 stopFrameUpdates()
                 initPlayer()
 
                 withContext(Dispatchers.IO) {
-                    println("openUri() - Calling openUri on native player")
                     SharedVideoPlayer.INSTANCE.openUri(playerPtr, uri)
                 }
 
@@ -140,13 +143,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 hasMedia = true
                 isLoading = false
                 isPlaying = true
-                println("openUri() - Media loaded successfully")
                 startFrameUpdates()
                 updateFrame()
 
-                // Restart playback if already playing
                 if (isPlaying) {
-                    println("openUri() - Player is in play mode, calling play()")
                     play()
                 }
             } catch (e: Exception) {
@@ -178,9 +178,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         stopFrameUpdates()
         frameUpdateJob = playerScope.launch {
             while (isActive) {
-                // On met toujours à jour l'image
                 updateFrame()
-                // On met à jour la position uniquement si l'utilisateur ne drag pas
                 if (!userDragging) {
                     updatePosition()
                 }
