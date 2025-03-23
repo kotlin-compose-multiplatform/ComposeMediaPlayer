@@ -234,13 +234,13 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 val current = getCurrentTime()
                 println("updatePosition() - current=$current, duration=$duration")
                 if (seekInProgress && targetSeekTime != null) {
-                    // Check if the player has reached the target seek position (tolerance: 0.3s)
                     if (abs(current - targetSeekTime!!) < 0.3) {
                         seekInProgress = false
                         targetSeekTime = null
                     }
                 } else {
-                    sliderPos = (current / duration).toFloat().coerceIn(0f, 1f)
+                    // Conversion en échelle 0..1000 pour correspondre au slider Compose
+                    sliderPos = (current / duration * 1000).toFloat().coerceIn(0f, 1000f)
                     println("updatePosition() - sliderPos updated to $sliderPos")
                     checkLooping(current, duration)
                 }
@@ -290,18 +290,20 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     }
 
     override fun seekTo(value: Float) {
-        println("seekTo() - Seeking to position (in seconds): $value")
+        println("seekTo() - Seeking with slider value: $value")
         playerScope.launch {
             val duration = getDuration()
             if (duration <= 0) {
                 println("seekTo() - Invalid duration, aborting seek")
                 return@launch
             }
-            val seekTime = value.coerceIn(0f, duration.toFloat())
-            println("seekTo() - Calculated seekTime=$seekTime")
+            // Convertir la valeur du slider (0..1000) en temps en secondes
+            val seekTime = ((value / 1000f) * duration.toFloat()).coerceIn(0f, duration.toFloat())
+            println("seekTo() - Calculated seekTime=$seekTime seconds")
             seekInProgress = true
             targetSeekTime = seekTime.toDouble()
-            sliderPos = seekTime / duration.toFloat()
+            // On conserve la valeur du slider en échelle 0..1000
+            sliderPos = value
 
             playerPtr?.let {
                 println("seekTo() - Calling seekTo on native player")
@@ -310,7 +312,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 }
             } ?: println("seekTo() - playerPtr is null")
 
-            // Optionally resume playback if the player was playing
             if (isPlaying) {
                 println("seekTo() - Resuming playback after seek")
                 play()
