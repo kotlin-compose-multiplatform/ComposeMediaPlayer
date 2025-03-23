@@ -91,8 +91,6 @@ class SharedVideoPlayer {
            screenRefreshRate = 60.0
        }
        #endif
-
-        print("Detected screen refresh rate: \(screenRefreshRate) Hz")
     }
 
     /// Detects the video's native frame rate from its asset
@@ -109,8 +107,6 @@ class SharedVideoPlayer {
             videoFrameRate = 30.0
         }
 
-        print("Detected video frame rate: \(videoFrameRate) fps")
-
         // Set capture rate to the lower of the two rates
         updateCaptureFrameRate()
     }
@@ -118,8 +114,6 @@ class SharedVideoPlayer {
     /// Updates the capture frame rate based on screen and video rates
     private func updateCaptureFrameRate() {
         captureFrameRate = min(screenRefreshRate, videoFrameRate)
-        print("Setting capture frame rate to: \(captureFrameRate) fps")
-
         // Update display link if it exists
         if isPlaying {
             configureDisplayLink()
