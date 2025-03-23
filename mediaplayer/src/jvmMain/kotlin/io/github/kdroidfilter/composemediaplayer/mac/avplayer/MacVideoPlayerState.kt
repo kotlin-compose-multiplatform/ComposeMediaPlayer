@@ -11,7 +11,6 @@ import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
-import io.github.kdroidfilter.composemediaplayer.sharedbuffer.SharedVideoPlayer
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import kotlinx.coroutines.*
 import java.awt.image.BufferedImage

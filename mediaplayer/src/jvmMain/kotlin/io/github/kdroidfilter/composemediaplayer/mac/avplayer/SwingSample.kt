@@ -1,7 +1,6 @@
 package io.github.kdroidfilter.composemediaplayer.mac.avplayer
 
 import com.sun.jna.Pointer
-import io.github.kdroidfilter.composemediaplayer.sharedbuffer.SharedVideoPlayer
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import java.awt.*
 import java.awt.image.BufferedImage
