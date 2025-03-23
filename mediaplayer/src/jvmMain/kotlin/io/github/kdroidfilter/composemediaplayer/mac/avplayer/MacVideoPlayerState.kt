@@ -178,8 +178,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         stopFrameUpdates()
         frameUpdateJob = playerScope.launch {
             while (isActive) {
-                if (!userDragging && !seekInProgress) {
-                    updateFrame()
+                // On met toujours à jour l'image
+                updateFrame()
+                // On met à jour la position uniquement si l'utilisateur ne drag pas
+                if (!userDragging) {
                     updatePosition()
                 }
                 delay(updateInterval)
@@ -297,12 +299,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 println("seekTo() - Invalid duration, aborting seek")
                 return@launch
             }
-            // Convertir la valeur du slider (0..1000) en temps en secondes
             val seekTime = ((value / 1000f) * duration.toFloat()).coerceIn(0f, duration.toFloat())
             println("seekTo() - Calculated seekTime=$seekTime seconds")
             seekInProgress = true
             targetSeekTime = seekTime.toDouble()
-            // On conserve la valeur du slider en échelle 0..1000
             sliderPos = value
 
             playerPtr?.let {
@@ -315,9 +315,24 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             if (isPlaying) {
                 println("seekTo() - Resuming playback after seek")
                 play()
+                // Forcer la mise à jour de l'image vidéo après un court délai
+                delay(100)
+                updateFrame()
+
+                // Si après 500 ms, le seek n'est pas considéré comme terminé, on le force
+                launch {
+                    delay(500)
+                    if (seekInProgress) {
+                        println("seekTo() - Forcing end of seek after timeout")
+                        seekInProgress = false
+                        targetSeekTime = null
+                    }
+                }
             }
         }
     }
+
+
 
     override fun dispose() {
         println("dispose() - Releasing resources")
