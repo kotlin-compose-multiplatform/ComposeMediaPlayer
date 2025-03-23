@@ -2,24 +2,29 @@ import Foundation
 import AVFoundation
 import CoreVideo
 import CoreGraphics
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Class that manages video playback and frame capture into an optimized shared buffer.
 class SharedVideoPlayer {
-    var player: AVPlayer?
-    var videoOutput: AVPlayerItemVideoOutput?
+    private var player: AVPlayer?
+    private var videoOutput: AVPlayerItemVideoOutput?
 
-    // Timer ~60fps
-    var timer: Timer?
+    // CADisplayLink for capturing frames at screen refresh rate (~60fps)
+    private var displayLink: CADisplayLink?
 
     // Shared buffer to store the frame in BGRA format (no conversion needed)
-    var frameBuffer: UnsafeMutablePointer<UInt32>?
+    private var frameBuffer: UnsafeMutablePointer<UInt32>?
+    private var bufferCapacity: Int = 0
 
     // Frame dimensions
-    var frameWidth: Int = 0
-    var frameHeight: Int = 0
+    private var frameWidth: Int = 0
+    private var frameHeight: Int = 0
 
     init() {}
 
+    /// Opens the video from the given URI (local or network)
     func openUri(_ uri: String) {
         // Determine the URL (local or network)
         let url: URL = {
@@ -44,19 +49,23 @@ class SharedVideoPlayer {
         frameWidth = Int(abs(effectiveSize.width))
         frameHeight = Int(abs(effectiveSize.height))
 
-        // Allocate (or reallocate) the shared buffer
+        // Allocate or reuse the shared buffer if capacity matches
         let totalPixels = frameWidth * frameHeight
-        if let buffer = frameBuffer {
-            buffer.deallocate()
+        if let buffer = frameBuffer, bufferCapacity == totalPixels {
+            buffer.initialize(repeating: 0, count: totalPixels)
+        } else {
+            frameBuffer?.deallocate()
+            frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
+            frameBuffer?.initialize(repeating: 0, count: totalPixels)
+            bufferCapacity = totalPixels
         }
-        frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
-        frameBuffer?.initialize(repeating: 0, count: totalPixels)
 
-        // Create attributes for the CVPixelBuffer (BGRA format)
+        // Create attributes for the CVPixelBuffer (BGRA format) with IOSurface for better performance
         let pixelBufferAttributes: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: frameWidth,
-            kCVPixelBufferHeightKey as String: frameHeight
+            kCVPixelBufferHeightKey as String: frameHeight,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
         ]
         videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
 
@@ -66,17 +75,36 @@ class SharedVideoPlayer {
         }
         player = AVPlayer(playerItem: item)
 
-        // Start the timer to capture frames at ~60fps
-        DispatchQueue.main.async {
-            self.timer?.invalidate()
-            self.timer = Timer.scheduledTimer(withTimeInterval: 0.0167, repeats: true) { _ in
-                self.captureFrame()
-            }
-        }
+        // Start display link for frame capture
+        startDisplayLink()
     }
 
-    func captureFrame() {
-        guard let output = videoOutput, let item = player?.currentItem else { return }
+    /// Starts the CADisplayLink for capturing frames at screen refresh rate (~60fps)
+    private func startDisplayLink() {
+        stopDisplayLink() // Ensure previous link is invalidated
+        #if canImport(UIKit)
+        displayLink = CADisplayLink(target: self, selector: #selector(captureFrame))
+        displayLink?.add(to: .main, forMode: .common)
+        #elseif os(macOS)
+        // For macOS, use CVDisplayLink or fallback to Timer if needed.
+        Timer.scheduledTimer(withTimeInterval: 0.0167, repeats: true) { [weak self] _ in
+            self?.captureFrame()
+        }
+        #endif
+    }
+
+    /// Stops the CADisplayLink
+    private func stopDisplayLink() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    /// Captures the latest frame from the video output if available.
+    @objc private func captureFrame() {
+        guard let output = videoOutput,
+              let item = player?.currentItem,
+              player?.rate != 0 else { return } // Skip capture if video is not playing
+
         let currentTime = item.currentTime()
         if output.hasNewPixelBuffer(forItemTime: currentTime),
            let pixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
@@ -85,7 +113,7 @@ class SharedVideoPlayer {
     }
 
     /// Directly copies the content of the pixelBuffer into the shared buffer without conversion.
-    func updateLatestFrameData(from pixelBuffer: CVPixelBuffer) {
+    private func updateLatestFrameData(from pixelBuffer: CVPixelBuffer) {
         guard let destBuffer = frameBuffer else { return }
 
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -112,21 +140,25 @@ class SharedVideoPlayer {
         }
     }
 
+    /// Starts video playback and resumes frame capture.
     func play() {
         player?.play()
+        startDisplayLink()
     }
 
+    /// Pauses video playback and stops frame capture.
     func pause() {
         player?.pause()
+        stopDisplayLink()
     }
 
-    /// Returns a pointer to the shared buffer. The caller should not free this pointer.
+    /// Returns a pointer to the shared frame buffer. The caller should not free this pointer.
     func getLatestFramePointer() -> UnsafeMutablePointer<UInt32>? {
         return frameBuffer
     }
 
-    func getFrameWidth() -> Int { frameWidth }
-    func getFrameHeight() -> Int { frameHeight }
+    func getFrameWidth() -> Int { return frameWidth }
+    func getFrameHeight() -> Int { return frameHeight }
 
     /// Returns the duration of the video in seconds.
     func getDuration() -> Double {
@@ -147,15 +179,15 @@ class SharedVideoPlayer {
         player.seek(to: newTime)
     }
 
+    /// Disposes of the video player and releases resources.
     func dispose() {
-        player?.pause()
+        pause()
         player = nil
-        timer?.invalidate()
-        timer = nil
         videoOutput = nil
         if let buffer = frameBuffer {
             buffer.deallocate()
             frameBuffer = nil
+            bufferCapacity = 0
         }
     }
 }

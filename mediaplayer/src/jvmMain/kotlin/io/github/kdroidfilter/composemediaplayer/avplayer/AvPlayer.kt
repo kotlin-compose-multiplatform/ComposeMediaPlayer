@@ -10,6 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.IntBuffer
 import javax.swing.*
+import javax.swing.Timer
 
 /**
  * JNA interface to the native library.
@@ -40,6 +41,8 @@ class VideoPlayerComponent : JPanel() {
     private var playerPtr: Pointer? = null
     private var bufferedImage: BufferedImage? = null
     private var frameTimer: Timer? = null
+    // Store the last playback time to avoid unnecessary updates when paused
+    private var lastUpdateTime: Double = -1.0
 
     init {
         background = Color.BLACK
@@ -59,6 +62,9 @@ class VideoPlayerComponent : JPanel() {
         super.removeNotify()
     }
 
+    /**
+     * Initializes the native VideoPlayer and starts the frame update timer.
+     */
     private fun initPlayer() {
         println("Initializing the native VideoPlayer with shared buffer...")
         playerPtr = SharedVideoPlayer.INSTANCE.createVideoPlayer()
@@ -71,12 +77,20 @@ class VideoPlayerComponent : JPanel() {
         }
     }
 
+    /**
+     * Updates the current frame if new frame data is available.
+     */
     private fun updateFrame() {
         if (playerPtr == null) return
 
         val width = SharedVideoPlayer.INSTANCE.getFrameWidth(playerPtr)
         val height = SharedVideoPlayer.INSTANCE.getFrameHeight(playerPtr)
         if (width <= 0 || height <= 0) return
+
+        // Optimization: Only update if playback time has changed
+        val currentTime = SharedVideoPlayer.INSTANCE.getCurrentTime(playerPtr)
+        if (currentTime == lastUpdateTime) return
+        lastUpdateTime = currentTime
 
         val framePtr = SharedVideoPlayer.INSTANCE.getLatestFrame(playerPtr) ?: return
 
@@ -100,6 +114,9 @@ class VideoPlayerComponent : JPanel() {
             val scaleFactor = panelWidth.toDouble() / it.width
             val scaledHeight = (it.height * scaleFactor).toInt()
             val y = (height - scaledHeight) / 2
+            // Use Graphics2D with nearest neighbor interpolation for performance
+            val g2d = g as? Graphics2D
+            g2d?.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
             g.drawImage(it, 0, y, panelWidth, scaledHeight, null)
         }
     }
@@ -152,6 +169,9 @@ class VideoPlayerComponent : JPanel() {
         playerPtr?.let { SharedVideoPlayer.INSTANCE.seekTo(it, time) }
     }
 
+    /**
+     * Disposes of the native video player.
+     */
     private fun disposePlayer() {
         playerPtr?.let {
             SharedVideoPlayer.INSTANCE.disposeVideoPlayer(it)
