@@ -5,14 +5,27 @@ import CoreGraphics
 #if canImport(UIKit)
 import UIKit
 #endif
+#if os(macOS)
+import AppKit
+#endif
 
 /// Class that manages video playback and frame capture into an optimized shared buffer.
+/// Frame capture rate adapts to the lower of screen refresh rate and video frame rate.
 class SharedVideoPlayer {
     private var player: AVPlayer?
     private var videoOutput: AVPlayerItemVideoOutput?
 
-    // CADisplayLink for capturing frames at screen refresh rate (~60fps)
+    // CADisplayLink for capturing frames at adaptive rate
     private var displayLink: CADisplayLink?
+
+    // Track the video's native frame rate
+    private var videoFrameRate: Float = 0.0
+
+    // Track the screen's refresh rate
+    private var screenRefreshRate: Float = 60.0
+
+    // The actual capture frame rate (minimum of video and screen rates)
+    private var captureFrameRate: Float = 0.0
 
     // Shared buffer to store the frame in BGRA format (no conversion needed)
     private var frameBuffer: UnsafeMutablePointer<UInt32>?
@@ -28,7 +41,85 @@ class SharedVideoPlayer {
     // Flag to track if playback is active
     private var isPlaying: Bool = false
 
-    init() {}
+    init() {
+        // Detect screen refresh rate
+        detectScreenRefreshRate()
+    }
+
+    /// Detects the current screen refresh rate
+    private func detectScreenRefreshRate() {
+        #if canImport(UIKit) && !os(tvOS)
+        if #available(iOS 10.3, *) {
+            screenRefreshRate = Float(UIScreen.main.maximumFramesPerSecond)
+        } else {
+            // Default to 60 fps for older iOS versions
+            screenRefreshRate = 60.0
+        }
+       #elseif os(macOS)
+       #elseif os(macOS)
+       if let mainScreen = NSScreen.main {
+           // Use CoreVideo DisplayLink to get refresh rate on macOS
+           var displayID: CGDirectDisplayID = CGMainDisplayID()
+           if let screenNumber = mainScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
+               displayID = CGDirectDisplayID(screenNumber.uint32Value)
+           }
+
+           var displayLink: CVDisplayLink?
+           let error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink)
+
+           if error == kCVReturnSuccess, let link = displayLink {
+               let actualRefreshRate = Double(CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link))
+               if actualRefreshRate > 0 {
+                   let timeScale = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link).timeScale
+                   if timeScale > 0 {
+                       // Convert to Hz (frames per second)
+                       let refreshRate = Double(timeScale) / actualRefreshRate
+                       screenRefreshRate = Float(refreshRate)
+                   }
+               }
+               CVDisplayLinkRelease(link)
+           } else {
+               // Fallback if we can't get the refresh rate
+               screenRefreshRate = 60.0
+           }
+       } else {
+           screenRefreshRate = 60.0
+       }
+       #endif
+
+        print("Detected screen refresh rate: \(screenRefreshRate) Hz")
+    }
+
+    /// Detects the video's native frame rate from its asset
+    private func detectVideoFrameRate(from asset: AVAsset) {
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            print("Video track not found for frame rate detection")
+            videoFrameRate = 30.0 // Default fallback
+            return
+        }
+
+        videoFrameRate = Float(videoTrack.nominalFrameRate)
+        if videoFrameRate <= 0 {
+            // Fallback to common default if detection fails
+            videoFrameRate = 30.0
+        }
+
+        print("Detected video frame rate: \(videoFrameRate) fps")
+
+        // Set capture rate to the lower of the two rates
+        updateCaptureFrameRate()
+    }
+
+    /// Updates the capture frame rate based on screen and video rates
+    private func updateCaptureFrameRate() {
+        captureFrameRate = min(screenRefreshRate, videoFrameRate)
+        print("Setting capture frame rate to: \(captureFrameRate) fps")
+
+        // Update display link if it exists
+        if isPlaying {
+            configureDisplayLink()
+        }
+    }
 
     /// Opens the video from the given URI (local or network)
     func openUri(_ uri: String) {
@@ -42,6 +133,9 @@ class SharedVideoPlayer {
         }()
 
         let asset = AVAsset(url: url)
+
+        // Detect video frame rate
+        detectVideoFrameRate(from: asset)
 
         // Retrieve the video track to obtain the actual dimensions
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
@@ -103,21 +197,37 @@ class SharedVideoPlayer {
         }
     }
 
-    /// Starts the CADisplayLink for capturing frames at screen refresh rate (~60fps)
-    private func startDisplayLink() {
+    /// Configures the CADisplayLink with the appropriate frame rate
+    private func configureDisplayLink() {
         stopDisplayLink() // Ensure previous link is invalidated
+
         #if canImport(UIKit)
         displayLink = CADisplayLink(target: self, selector: #selector(captureFrame))
+
+        if #available(iOS 15.0, tvOS 15.0, *) {
+            // Modern API - set preferred frame rate directly
+            displayLink?.preferredFrameRateRange = CAFrameRateRange(
+                minimum: captureFrameRate,
+                maximum: captureFrameRate,
+                preferred: captureFrameRate
+            )
+        } else {
+            // Legacy API - use frame interval
+            let frameInterval = Int(round(screenRefreshRate / captureFrameRate))
+            displayLink?.preferredFramesPerSecond = Int(screenRefreshRate) / frameInterval
+        }
+
         displayLink?.add(to: .main, forMode: .common)
         #elseif os(macOS)
-        // For macOS, use CVDisplayLink or fallback to Timer if needed.
-        Timer.scheduledTimer(withTimeInterval: 0.0167, repeats: true) { [weak self] _ in
+        // For macOS, use a timer with the appropriate interval
+        let interval = 1.0 / Double(captureFrameRate)
+        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.captureFrame()
         }
         #endif
     }
 
-    /// Stops the CADisplayLink
+    /// Stops the CADisplayLink or timer
     private func stopDisplayLink() {
         displayLink?.invalidate()
         displayLink = nil
@@ -164,11 +274,11 @@ class SharedVideoPlayer {
         }
     }
 
-    /// Starts video playback and resumes frame capture.
+    /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
         isPlaying = true
         player?.play()
-        startDisplayLink()
+        configureDisplayLink()
     }
 
     /// Pauses video playback and stops frame capture.
@@ -203,8 +313,20 @@ class SharedVideoPlayer {
         return frameBuffer
     }
 
+    /// Returns the width of the video frame in pixels
     func getFrameWidth() -> Int { return frameWidth }
+
+    /// Returns the height of the video frame in pixels
     func getFrameHeight() -> Int { return frameHeight }
+
+    /// Returns the detected video frame rate
+    func getVideoFrameRate() -> Float { return videoFrameRate }
+
+    /// Returns the detected screen refresh rate
+    func getScreenRefreshRate() -> Float { return screenRefreshRate }
+
+    /// Returns the current capture frame rate (minimum of video and screen rates)
+    func getCaptureFrameRate() -> Float { return captureFrameRate }
 
     /// Returns the duration of the video in seconds.
     func getDuration() -> Double {
@@ -324,6 +446,27 @@ public func getFrameHeight(_ context: UnsafeMutableRawPointer?) -> Int32 {
     guard let context = context else { return 0 }
     let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
     return Int32(player.getFrameHeight())
+}
+
+@_cdecl("getVideoFrameRate")
+public func getVideoFrameRate(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getVideoFrameRate()
+}
+
+@_cdecl("getScreenRefreshRate")
+public func getScreenRefreshRate(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getScreenRefreshRate()
+}
+
+@_cdecl("getCaptureFrameRate")
+public func getCaptureFrameRate(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getCaptureFrameRate()
 }
 
 @_cdecl("getVideoDuration")

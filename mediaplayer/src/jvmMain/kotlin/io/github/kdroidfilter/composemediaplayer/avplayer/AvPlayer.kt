@@ -13,6 +13,7 @@ import javax.swing.*
 
 /**
  * JNA interface to the native library.
+ * Includes new methods to retrieve frame rate information.
  */
 internal interface SharedVideoPlayer : Library {
     fun createVideoPlayer(): Pointer?
@@ -24,6 +25,9 @@ internal interface SharedVideoPlayer : Library {
     fun getLatestFrame(context: Pointer?): Pointer?
     fun getFrameWidth(context: Pointer?): Int
     fun getFrameHeight(context: Pointer?): Int
+    fun getVideoFrameRate(context: Pointer?): Float
+    fun getScreenRefreshRate(context: Pointer?): Float
+    fun getCaptureFrameRate(context: Pointer?): Float
     fun getVideoDuration(context: Pointer?): Double
     fun getCurrentTime(context: Pointer?): Double
     fun seekTo(context: Pointer?, time: Double)
@@ -37,13 +41,19 @@ internal interface SharedVideoPlayer : Library {
 
 /**
  * Swing component that periodically retrieves frames from the shared buffer.
- * Optimized to reduce CPU usage when paused.
+ * Optimized to reduce CPU usage by adapting to the video's native frame rate
+ * and screen refresh rate.
  */
 class VideoPlayerComponent : JPanel() {
     private var playerPtr: Pointer? = null
     private var bufferedImage: BufferedImage? = null
     private var frameTimer: Timer? = null
     private var isPlaying: Boolean = false
+
+    // Cached frame rate values
+    private var videoFrameRate: Float = 0.0f
+    private var screenRefreshRate: Float = 0.0f
+    private var captureFrameRate: Float = 0.0f
 
     init {
         background = Color.BLACK
@@ -72,13 +82,32 @@ class VideoPlayerComponent : JPanel() {
     }
 
     /**
-     * Starts the frame refresh timer at ~60 fps but only when playing
+     * Updates frame rate information from the native player
+     */
+    private fun updateFrameRateInfo() {
+        playerPtr?.let { ptr ->
+            videoFrameRate = SharedVideoPlayer.INSTANCE.getVideoFrameRate(ptr)
+            screenRefreshRate = SharedVideoPlayer.INSTANCE.getScreenRefreshRate(ptr)
+            captureFrameRate = SharedVideoPlayer.INSTANCE.getCaptureFrameRate(ptr)
+            println("Frame rates - Video: $videoFrameRate fps, Screen: $screenRefreshRate Hz, Capture: $captureFrameRate fps")
+        }
+    }
+
+    /**
+     * Starts the frame refresh timer at optimized frame rate
      */
     private fun startRefreshTimer() {
         stopRefreshTimer()
+        updateFrameRateInfo()
+
+        // Calculate refresh interval based on actual capture frame rate
+        val refreshInterval = if (captureFrameRate > 0) (1000.0f / captureFrameRate).toInt() else 16
+
         isPlaying = true
-        frameTimer = Timer(16) { updateFrame() }
+        frameTimer = Timer(refreshInterval) { updateFrame() }
         frameTimer?.start()
+
+        println("Started frame timer with interval: $refreshInterval ms")
     }
 
     /**
@@ -147,6 +176,10 @@ class VideoPlayerComponent : JPanel() {
         }
         println("Opening media: $uri")
         SharedVideoPlayer.INSTANCE.openUri(playerPtr, uri)
+
+        // Update frame rate information
+        updateFrameRateInfo()
+
         // Get the initial frame without starting the timer
         updateSingleFrame()
     }
@@ -185,6 +218,27 @@ class VideoPlayerComponent : JPanel() {
      */
     fun getVolume(): Float {
         return playerPtr?.let { SharedVideoPlayer.INSTANCE.getVolume(it) } ?: 1.0f
+    }
+
+    /**
+     * Returns the video's native frame rate in fps.
+     */
+    fun getVideoFrameRate(): Float {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getVideoFrameRate(it) } ?: 0.0f
+    }
+
+    /**
+     * Returns the screen's refresh rate in Hz.
+     */
+    fun getScreenRefreshRate(): Float {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getScreenRefreshRate(it) } ?: 0.0f
+    }
+
+    /**
+     * Returns the actual capture frame rate being used (minimum of video and screen rates).
+     */
+    fun getCaptureFrameRate(): Float {
+        return playerPtr?.let { SharedVideoPlayer.INSTANCE.getCaptureFrameRate(it) } ?: 0.0f
     }
 
     /**
