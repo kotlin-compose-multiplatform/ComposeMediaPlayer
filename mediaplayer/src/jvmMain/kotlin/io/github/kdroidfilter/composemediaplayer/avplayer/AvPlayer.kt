@@ -37,11 +37,13 @@ internal interface SharedVideoPlayer : Library {
 
 /**
  * Swing component that periodically retrieves frames from the shared buffer.
+ * Optimized to reduce CPU usage when paused.
  */
 class VideoPlayerComponent : JPanel() {
     private var playerPtr: Pointer? = null
     private var bufferedImage: BufferedImage? = null
     private var frameTimer: Timer? = null
+    private var isPlaying: Boolean = false
 
     init {
         background = Color.BLACK
@@ -56,7 +58,7 @@ class VideoPlayerComponent : JPanel() {
     }
 
     override fun removeNotify() {
-        frameTimer?.stop()
+        stopRefreshTimer()
         disposePlayer()
         super.removeNotify()
     }
@@ -64,15 +66,33 @@ class VideoPlayerComponent : JPanel() {
     private fun initPlayer() {
         println("Initializing the native VideoPlayer with shared buffer...")
         playerPtr = SharedVideoPlayer.INSTANCE.createVideoPlayer()
-        if (playerPtr != null) {
-            // Timer to refresh images (~60 fps)
-            frameTimer = Timer(16) { updateFrame() }
-            frameTimer?.start()
-        } else {
+        if (playerPtr == null) {
             System.err.println("Failed to create the native video player.")
         }
     }
 
+    /**
+     * Starts the frame refresh timer at ~60 fps but only when playing
+     */
+    private fun startRefreshTimer() {
+        stopRefreshTimer()
+        isPlaying = true
+        frameTimer = Timer(16) { updateFrame() }
+        frameTimer?.start()
+    }
+
+    /**
+     * Stops the frame refresh timer to reduce CPU usage when paused
+     */
+    private fun stopRefreshTimer() {
+        frameTimer?.stop()
+        frameTimer = null
+        isPlaying = false
+    }
+
+    /**
+     * Updates the current frame from the shared buffer
+     */
     private fun updateFrame() {
         if (playerPtr == null) return
 
@@ -93,6 +113,16 @@ class VideoPlayerComponent : JPanel() {
         intBuffer.get(pixelArray)
 
         repaint()
+    }
+
+    /**
+     * Performs a single frame update without starting the timer
+     * Used when we need to update the display but not continuously
+     */
+    private fun updateSingleFrame() {
+        if (!isPlaying) {
+            updateFrame()
+        }
     }
 
     override fun paintComponent(g: Graphics) {
@@ -117,20 +147,30 @@ class VideoPlayerComponent : JPanel() {
         }
         println("Opening media: $uri")
         SharedVideoPlayer.INSTANCE.openUri(playerPtr, uri)
+        // Get the initial frame without starting the timer
+        updateSingleFrame()
     }
 
     /**
      * Starts playback.
      */
     fun play() {
-        playerPtr?.let { SharedVideoPlayer.INSTANCE.playVideo(it) }
+        playerPtr?.let {
+            SharedVideoPlayer.INSTANCE.playVideo(it)
+            startRefreshTimer()
+        }
     }
 
     /**
      * Pauses playback.
      */
     fun pause() {
-        playerPtr?.let { SharedVideoPlayer.INSTANCE.pauseVideo(it) }
+        playerPtr?.let {
+            SharedVideoPlayer.INSTANCE.pauseVideo(it)
+            stopRefreshTimer()
+            // Get the frame at pause position
+            updateSingleFrame()
+        }
     }
 
     /**
@@ -165,7 +205,11 @@ class VideoPlayerComponent : JPanel() {
      * Seeks to the specified time (in seconds).
      */
     fun seekTo(time: Double) {
-        playerPtr?.let { SharedVideoPlayer.INSTANCE.seekTo(it, time) }
+        playerPtr?.let {
+            SharedVideoPlayer.INSTANCE.seekTo(it, time)
+            // Update the display after seeking
+            updateSingleFrame()
+        }
     }
 
     private fun disposePlayer() {

@@ -25,6 +25,9 @@ class SharedVideoPlayer {
     // Audio volume control (0.0 to 1.0)
     private var volume: Float = 1.0
 
+    // Flag to track if playback is active
+    private var isPlaying: Bool = false
+
     init() {}
 
     /// Opens the video from the given URI (local or network)
@@ -81,8 +84,23 @@ class SharedVideoPlayer {
         // Set initial volume
         player?.volume = volume
 
-        // Start display link for frame capture
-        startDisplayLink()
+        // Capture initial frame
+        captureInitialFrame()
+    }
+
+    /// Captures initial frame to display without starting the display link
+    private func captureInitialFrame() {
+        guard let output = videoOutput, let item = player?.currentItem else { return }
+
+        // Seek to the beginning to ensure we have a frame
+        let zeroTime = CMTime.zero
+        player?.seek(to: zeroTime)
+
+        // Try to get the first frame
+        if output.hasNewPixelBuffer(forItemTime: zeroTime),
+           let pixelBuffer = output.copyPixelBuffer(forItemTime: zeroTime, itemTimeForDisplay: nil) {
+            updateLatestFrameData(from: pixelBuffer)
+        }
     }
 
     /// Starts the CADisplayLink for capturing frames at screen refresh rate (~60fps)
@@ -109,7 +127,7 @@ class SharedVideoPlayer {
     @objc private func captureFrame() {
         guard let output = videoOutput,
               let item = player?.currentItem,
-              player?.rate != 0 else { return } // Skip capture if video is not playing
+              isPlaying == true else { return } // Skip capture if video is not playing
 
         let currentTime = item.currentTime()
         if output.hasNewPixelBuffer(forItemTime: currentTime),
@@ -148,14 +166,25 @@ class SharedVideoPlayer {
 
     /// Starts video playback and resumes frame capture.
     func play() {
+        isPlaying = true
         player?.play()
         startDisplayLink()
     }
 
     /// Pauses video playback and stops frame capture.
     func pause() {
+        isPlaying = false
         player?.pause()
         stopDisplayLink()
+
+        // Capture the current frame to display while paused
+        if let output = videoOutput, let item = player?.currentItem {
+            let currentTime = item.currentTime()
+            if output.hasNewPixelBuffer(forItemTime: currentTime),
+               let pixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
+                updateLatestFrameData(from: pixelBuffer)
+            }
+        }
     }
 
     /// Sets the volume level (0.0 to 1.0)
@@ -194,6 +223,14 @@ class SharedVideoPlayer {
         guard let player = player else { return }
         let newTime = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: newTime)
+
+        // Update frame at the new position if paused
+        if !isPlaying, let output = videoOutput {
+            if output.hasNewPixelBuffer(forItemTime: newTime),
+               let pixelBuffer = output.copyPixelBuffer(forItemTime: newTime, itemTimeForDisplay: nil) {
+                updateLatestFrameData(from: pixelBuffer)
+            }
+        }
     }
 
     /// Disposes of the video player and releases resources.
