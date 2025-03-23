@@ -76,6 +76,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override var currentSubtitleTrack: SubtitleTrack? by mutableStateOf(null)
     override val availableSubtitleTracks: MutableList<SubtitleTrack> = mutableListOf()
     override val metadata: VideoMetadata = VideoMetadata()
+    private var lastUri: String? = null
+
 
     // Non-blocking text properties
     private val _positionText = mutableStateOf("")
@@ -180,6 +182,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     override fun openUri(uri: String) {
         macLogger.d { "openUri() - Opening URI: $uri" }
+
+        lastUri = uri
 
         // Update UI state first
         ioScope.launch {
@@ -549,13 +553,18 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+
     override fun play() {
         macLogger.d { "play() - Starting playback" }
         ioScope.launch {
-            if (hasMedia) {
+            if (!hasMedia && lastUri != null) {
+                // Reload the media using the saved URI
+                openUri(lastUri!!)
+                // The openUri method will start reading if the opening is successful
+            } else if (hasMedia) {
+                // If the media is already loaded, start playing in the background
                 playInBackground()
             } else {
-                // If no media, ensure loading state is false
                 withContext(Dispatchers.Main) {
                     isPlaying = false
                     isLoading = false
@@ -563,6 +572,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             }
         }
     }
+
 
     /** Plays video on a background thread. */
     private suspend fun playInBackground() {
