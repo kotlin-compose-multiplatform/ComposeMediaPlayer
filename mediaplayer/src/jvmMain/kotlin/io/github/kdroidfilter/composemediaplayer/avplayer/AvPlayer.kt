@@ -22,7 +22,6 @@ internal interface SharedVideoPlayer : Library {
     fun disposeVideoPlayer(context: Pointer?)
 
     companion object {
-        // Remplacez "NativeVideoPlayer" par le nom effectif de votre librairie
         val INSTANCE: SharedVideoPlayer =
             Native.load("NativeVideoPlayer", SharedVideoPlayer::class.java)
     }
@@ -96,12 +95,19 @@ class VideoPlayerComponent : JPanel() {
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)
         bufferedImage?.let {
-            // Centrer l'image dans le panneau
-            val x = (width - it.width) / 2
-            val y = (height - it.height) / 2
-            g.drawImage(it, x, y, null)
+            // Obtenir la largeur du panneau
+            val panelWidth = width
+            // Calculer le facteur d'échelle pour que l'image occupe toute la largeur
+            val scaleFactor = panelWidth.toDouble() / it.width
+            // Calculer la nouvelle hauteur en respectant le ratio de l'image
+            val scaledHeight = (it.height * scaleFactor).toInt()
+            // Centrer verticalement l'image
+            val y = (height - scaledHeight) / 2
+            // Dessiner l'image redimensionnée
+            g.drawImage(it, 0, y, panelWidth, scaledHeight, null)
         }
     }
+
 
     fun openMedia(uri: String) {
         if (playerPtr == null) {
@@ -186,3 +192,4 @@ fun main() {
         frame.isVisible = true
     }
 }
+

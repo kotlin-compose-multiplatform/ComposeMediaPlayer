@@ -15,29 +15,20 @@ class SharedVideoPlayer {
     var player: AVPlayer?
     var videoOutput: AVPlayerItemVideoOutput?
     
-    // On remplace l'ancien Timer 30fps par un intervalle ~60fps
+    // Intervalle ~60fps
     var timer: Timer?
-    
+
     // latestFrameData contiendra les pixels au format ARGB (0xAARRGGBB)
     var latestFrameData: [UInt32] = []
-    
-    // Dimensions de la frame (fixées ici)
-    let frameWidth: Int = 640
-    let frameHeight: Int = 360
+
+    // Dimensions de la frame qui seront déterminées dynamiquement
+    var frameWidth: Int = 0
+    var frameHeight: Int = 0
 
     init() {
-        // Utilisation du format BGRA pour des performances optimisées
-        let pixelBufferAttributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: frameWidth,
-            kCVPixelBufferHeightKey as String: frameHeight
-        ]
-        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
-        
-        // Pré-allocation du buffer pour stocker les pixels en ARGB
-        latestFrameData = Array(repeating: 0, count: frameWidth * frameHeight)
+        // L'initialisation se fait désormais lors de l'ouverture de la vidéo
     }
-    
+
     func openUri(_ uri: String) {
         let url: URL
         if let parsedURL = URL(string: uri), parsedURL.scheme != nil {
@@ -47,10 +38,34 @@ class SharedVideoPlayer {
             // Chemin de fichier local
             url = URL(fileURLWithPath: uri)
         }
-        
+
         let asset = AVAsset(url: url)
+
+        // Récupération de la première piste vidéo pour obtenir la taille
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            print("Piste vidéo non trouvée")
+            return
+        }
+
+        // Calcul de la taille effective en tenant compte de la rotation éventuelle
+        let naturalSize = videoTrack.naturalSize
+        let transform = videoTrack.preferredTransform
+        let effectiveSize = naturalSize.applying(transform)
+        frameWidth = Int(abs(effectiveSize.width))
+        frameHeight = Int(abs(effectiveSize.height))
+
+        // Pré-allocation du buffer pour stocker les pixels en ARGB
+        latestFrameData = Array(repeating: 0, count: frameWidth * frameHeight)
+
+        // Création des attributs pour le pixel buffer en utilisant la taille dynamique
+        let pixelBufferAttributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: frameWidth,
+            kCVPixelBufferHeightKey as String: frameHeight
+        ]
+        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
+
         let item = AVPlayerItem(asset: asset)
-        
         if let output = videoOutput {
             item.add(output)
         }
