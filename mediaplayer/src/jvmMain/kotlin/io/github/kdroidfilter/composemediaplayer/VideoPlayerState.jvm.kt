@@ -4,6 +4,8 @@ import androidx.compose.runtime.Stable
 import com.sun.jna.Platform
 import io.github.kdroidfilter.composemediaplayer.javafx.JavaFxVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.linux.LinuxVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerState
+import io.github.kdroidfilter.composemediaplayer.mac.avplayer.MacVideoPlayerSurface
 import io.github.kdroidfilter.composemediaplayer.windows.compose.WindowsVideoPlayerState
 import io.github.vinceglb.filekit.PlatformFile
 
@@ -40,7 +42,7 @@ import io.github.vinceglb.filekit.PlatformFile
 actual open class VideoPlayerState {
     val delegate: PlatformVideoPlayerState = when {
         Platform.isWindows() -> WindowsVideoPlayerState()
-        Platform.isMac() -> JavaFxVideoPlayerState()
+        Platform.isMac() -> MacVideoPlayerState()
         Platform.isLinux() -> LinuxVideoPlayerState()
         else -> throw UnsupportedOperationException("Unsupported platform")
     }

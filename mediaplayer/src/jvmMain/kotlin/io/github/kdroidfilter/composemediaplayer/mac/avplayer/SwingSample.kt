@@ -1,4 +1,4 @@
-package io.github.kdroidfilter.composemediaplayer.avplayer
+package io.github.kdroidfilter.composemediaplayer.mac.avplayer
 
 import io.github.kdroidfilter.composemediaplayer.sharedbuffer.VideoPlayerComponent
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
