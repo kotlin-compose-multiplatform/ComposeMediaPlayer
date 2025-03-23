@@ -99,7 +99,12 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
 
     private val updateInterval: Long
-        get() = if (captureFrameRate > 0) (1000.0f / captureFrameRate).toLong().coerceAtLeast(33L) else 33L
+        get() = if (captureFrameRate > 0) {
+            (1000.0f / captureFrameRate).toLong()
+        } else {
+            33L  // Valeur par défaut (en ms) si aucune valeur valide n'est renvoyée
+        }
+
 
     // Buffering detection constants
     private val bufferingCheckInterval = 200L // Increased from 100ms to reduce CPU usage
@@ -114,8 +119,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     }
 
     /**
-     * Starts a job to update UI state based on frame updates.
-     * This is the only job that touches the main thread.
+     * Starts a job to update UI state based on frame updates. This is the only
+     * job that touches the main thread.
      */
     @OptIn(FlowPreview::class)
     private fun startUIUpdateJob() {
@@ -234,9 +239,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /**
-     * Cleans up current playback state.
-     */
+    /** Cleans up current playback state. */
     private suspend fun cleanupCurrentPlayback() {
         macLogger.d { "cleanupCurrentPlayback() - Cleaning up current playback" }
         pauseInBackground()
@@ -259,9 +262,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /**
-     * Ensures player is initialized.
-     */
+    /** Ensures player is initialized. */
     private suspend fun ensurePlayerInitialized() {
         macLogger.d { "ensurePlayerInitialized() - Ensuring player is initialized" }
         if (!playerScope.isActive) {
@@ -281,9 +282,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /**
-     * Opens media URI and returns success state.
-     */
+    /** Opens media URI and returns success state. */
     private suspend fun openMediaUri(uri: String): Boolean {
         macLogger.d { "openMediaUri() - Opening URI: $uri" }
         val ptr = mainMutex.withLock { playerPtr } ?: return false
@@ -393,8 +392,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     /**
      * Calculates a simple hash of the image data to detect if the frame has
-     * changed. Running in compute dispatcher for CPU-intensive work.
-     * Optimized to sample fewer pixels to improve performance.
+     * changed. Running in compute dispatcher for CPU-intensive work. Optimized
+     * to sample fewer pixels to improve performance.
      */
     private suspend fun calculateFrameHash(data: IntArray): Int = withContext(Dispatchers.Default) {
         var hash = 0
