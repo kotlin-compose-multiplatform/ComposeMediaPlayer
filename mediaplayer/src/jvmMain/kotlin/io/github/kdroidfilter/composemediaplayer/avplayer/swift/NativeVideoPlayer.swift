@@ -1,63 +1,58 @@
-//
-//  SharedVideoPlayer.swift
-//
-//  Créé par Elie Gambache le 23/03/2025
-//
-
 import Foundation
 import AVFoundation
 import CoreVideo
 import CoreGraphics
-import Accelerate
 
-/// Classe qui gère la lecture vidéo et la capture des frames dans un buffer partagé.
+/// Class that manages video playback and frame capture into an optimized shared buffer.
 class SharedVideoPlayer {
     var player: AVPlayer?
     var videoOutput: AVPlayerItemVideoOutput?
-    
-    // Intervalle ~60fps
+
+    // Timer ~60fps
     var timer: Timer?
 
-    // latestFrameData contiendra les pixels au format ARGB (0xAARRGGBB)
-    var latestFrameData: [UInt32] = []
+    // Shared buffer to store the frame in BGRA format (no conversion necessary)
+    var frameBuffer: UnsafeMutablePointer<UInt32>?
 
-    // Dimensions de la frame qui seront déterminées dynamiquement
+    // Frame dimensions
     var frameWidth: Int = 0
     var frameHeight: Int = 0
 
-    init() {
-        // L'initialisation se fait désormais lors de l'ouverture de la vidéo
-    }
+    init() {}
 
     func openUri(_ uri: String) {
-        let url: URL
-        if let parsedURL = URL(string: uri), parsedURL.scheme != nil {
-            // URL réseau ou locale
-            url = parsedURL
-        } else {
-            // Chemin de fichier local
-            url = URL(fileURLWithPath: uri)
-        }
+        // Determine the URL (local or network)
+        let url: URL = {
+            if let parsedURL = URL(string: uri), parsedURL.scheme != nil {
+                return parsedURL
+            } else {
+                return URL(fileURLWithPath: uri)
+            }
+        }()
 
         let asset = AVAsset(url: url)
 
-        // Récupération de la première piste vidéo pour obtenir la taille
+        // Retrieve the video track to obtain the effective dimensions
         guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            print("Piste vidéo non trouvée")
+            print("Video track not found")
             return
         }
 
-        // Calcul de la taille effective en tenant compte de la rotation éventuelle
         let naturalSize = videoTrack.naturalSize
         let transform = videoTrack.preferredTransform
         let effectiveSize = naturalSize.applying(transform)
         frameWidth = Int(abs(effectiveSize.width))
         frameHeight = Int(abs(effectiveSize.height))
 
-        // Pré-allocation du buffer pour stocker les pixels en ARGB
-        latestFrameData = Array(repeating: 0, count: frameWidth * frameHeight)
+        // Allocate (or reallocate) the shared buffer
+        let totalPixels = frameWidth * frameHeight
+        if let buffer = frameBuffer {
+            buffer.deallocate()
+        }
+        frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
+        frameBuffer?.initialize(repeating: 0, count: totalPixels)
 
-        // Création des attributs pour le pixel buffer en utilisant la taille dynamique
+        // Create the attributes for the CVPixelBuffer (BGRA format)
         let pixelBufferAttributes: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: frameWidth,
@@ -70,8 +65,8 @@ class SharedVideoPlayer {
             item.add(output)
         }
         player = AVPlayer(playerItem: item)
-        
-        // Démarrage d'un Timer ~60fps (0.0167 s)
+
+        // Start the timer to capture frames at ~60fps
         DispatchQueue.main.async {
             self.timer?.invalidate()
             self.timer = Timer.scheduledTimer(withTimeInterval: 0.0167, repeats: true) { _ in
@@ -79,81 +74,76 @@ class SharedVideoPlayer {
             }
         }
     }
-    
+
     func captureFrame() {
-        guard let output = videoOutput,
-              let item = player?.currentItem else { return }
-        
+        guard let output = videoOutput, let item = player?.currentItem else { return }
         let currentTime = item.currentTime()
         if output.hasNewPixelBuffer(forItemTime: currentTime),
            let pixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
             updateLatestFrameData(from: pixelBuffer)
         }
     }
-    
-    /// Conversion du format BGRA en ARGB pour compatibilité avec BufferedImage en Java
+
+    /// Directly copies the content of the pixelBuffer into the shared buffer without any conversion.
     func updateLatestFrameData(from pixelBuffer: CVPixelBuffer) {
+        guard let destBuffer = frameBuffer else { return }
+
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
 
-        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
-
+        guard let srcBaseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let srcBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
 
         guard width == frameWidth, height == frameHeight else {
-            print("Dimensions de la frame inattendues : \(width)x\(height)")
+            print("Unexpected frame dimensions: \(width)x\(height)")
             return
         }
 
-        latestFrameData.withUnsafeMutableBytes { destRawBuffer in
-            // Si le stride correspond à la largeur * 4 (octets par pixel), on copie directement
-            if srcBytesPerRow == width * 4 {
-                memcpy(destRawBuffer.baseAddress, baseAddress, height * srcBytesPerRow)
-            } else {
-                // Sinon, copie ligne par ligne
-                for row in 0..<height {
-                    let srcRow = baseAddress.advanced(by: row * srcBytesPerRow)
-                    let destRow = destRawBuffer.baseAddress!.advanced(by: row * width * 4)
-                    memcpy(destRow, srcRow, width * 4)
-                }
+        // If the stride matches width * 4, perform a direct copy, otherwise copy line by line
+        if srcBytesPerRow == width * 4 {
+            memcpy(destBuffer, srcBaseAddress, height * srcBytesPerRow)
+        } else {
+            for row in 0..<height {
+                let srcRow = srcBaseAddress.advanced(by: row * srcBytesPerRow)
+                let destRow = destBuffer.advanced(by: row * width)
+                memcpy(destRow, srcRow, width * 4)
             }
         }
     }
 
-    
     func play() {
         player?.play()
     }
-    
+
     func pause() {
         player?.pause()
     }
-    
-    /// Retourne un pointeur alloué contenant la dernière frame (pixels en ARGB)
-    /// L'appelant devra libérer ce pointeur après usage, le code Java se charge juste de lire et de copier.
+
+    /// Returns a pointer to the shared buffer. The caller **must not free** this pointer.
     func getLatestFramePointer() -> UnsafeMutablePointer<UInt32>? {
-        if latestFrameData.isEmpty { return nil }
-        let count = latestFrameData.count
-        let pointer = UnsafeMutablePointer<UInt32>.allocate(capacity: count)
-        pointer.initialize(from: latestFrameData, count: count)
-        return pointer
+        return frameBuffer
     }
-    
+
     func getFrameWidth() -> Int { frameWidth }
     func getFrameHeight() -> Int { frameHeight }
-    
+
     func dispose() {
         player?.pause()
         player = nil
         timer?.invalidate()
         timer = nil
-        latestFrameData.removeAll()
+        videoOutput = nil
+        if let buffer = frameBuffer {
+            buffer.deallocate()
+            frameBuffer = nil
+        }
     }
 }
 
-/// MARK: - Fonctions C exportées pour JNA
+/// MARK: - C Functions Exported for JNA
+
 @_cdecl("createVideoPlayer")
 public func createVideoPlayer() -> UnsafeMutableRawPointer? {
     let player = SharedVideoPlayer()
@@ -164,9 +154,8 @@ public func createVideoPlayer() -> UnsafeMutableRawPointer? {
 public func openUri(_ context: UnsafeMutableRawPointer?, _ uri: UnsafePointer<CChar>?) {
     guard let context = context,
           let uriCStr = uri,
-          let swiftUri = String(validatingUTF8: uriCStr)
-    else {
-        print("Paramètres invalides pour openUri")
+          let swiftUri = String(validatingUTF8: uriCStr) else {
+        print("Invalid parameters for openUri")
         return
     }
     let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
