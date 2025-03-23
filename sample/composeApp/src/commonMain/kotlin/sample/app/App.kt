@@ -39,7 +39,7 @@ import io.github.vinceglb.filekit.name
 fun App() {
     MaterialTheme {
         // Default video URL
-        var videoUrl by remember { mutableStateOf("http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }
+        var videoUrl by remember { mutableStateOf("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4") }
         val playerState = rememberVideoPlayerState()
 
         // List of subtitle tracks and the currently selected track
