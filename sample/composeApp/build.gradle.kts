@@ -12,20 +12,6 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
-
-val fxClassifier = when {
-    osName.contains("linux") && osArch.contains("aarch64") -> "linux-aarch64"
-    osName.contains("linux") -> "linux"
-    osName.contains("windows") -> "win"
-    osName.contains("mac") && osArch.contains("aarch64") -> "mac-aarch64"
-    osName.contains("mac") -> "mac"
-    else -> throw IllegalStateException("Unsupported OS: $osName")
-}
-
-val javafxVersion = "22.0.1"
-
 
 kotlin {
     jvmToolchain(17)
@@ -79,10 +65,6 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.jna)
             implementation(libs.jna.platform)
-            implementation("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-swing:${javafxVersion}:${fxClassifier}")
-            implementation("org.openjfx:javafx-media:${javafxVersion}:${fxClassifier}")
         }
     }
 }
