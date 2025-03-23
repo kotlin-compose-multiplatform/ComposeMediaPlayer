@@ -1,12 +1,13 @@
-import Foundation
 import AVFoundation
-import CoreVideo
 import CoreGraphics
+import CoreVideo
+import Foundation
+
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 #if os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 /// Class that manages video playback and frame capture into an optimized shared buffer.
@@ -45,7 +46,6 @@ class SharedVideoPlayer {
     private var leftAudioLevel: Float = 0.0
     private var rightAudioLevel: Float = 0.0
 
-
     init() {
         // Detect screen refresh rate
         detectScreenRefreshRate()
@@ -54,61 +54,69 @@ class SharedVideoPlayer {
     /// Detects the current screen refresh rate
     private func detectScreenRefreshRate() {
         #if canImport(UIKit) && !os(tvOS)
-        if #available(iOS 10.3, *) {
-            screenRefreshRate = Float(UIScreen.main.maximumFramesPerSecond)
-        } else {
-            // Default to 60 fps for older iOS versions
-            screenRefreshRate = 60.0
-        }
-       #elseif os(macOS)
-       #elseif os(macOS)
-       if let mainScreen = NSScreen.main {
-           // Use CoreVideo DisplayLink to get refresh rate on macOS
-           var displayID: CGDirectDisplayID = CGMainDisplayID()
-           if let screenNumber = mainScreen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
-               displayID = CGDirectDisplayID(screenNumber.uint32Value)
-           }
+            if #available(iOS 10.3, *) {
+                screenRefreshRate = Float(UIScreen.main.maximumFramesPerSecond)
+            } else {
+                // Default to 60 fps for older iOS versions
+                screenRefreshRate = 60.0
+            }
+        #elseif os(macOS)
+        #elseif os(macOS)
+            if let mainScreen = NSScreen.main {
+                // Use CoreVideo DisplayLink to get refresh rate on macOS
+                var displayID: CGDirectDisplayID = CGMainDisplayID()
+                if let screenNumber = mainScreen.deviceDescription[
+                    NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+                {
+                    displayID = CGDirectDisplayID(screenNumber.uint32Value)
+                }
 
-           var displayLink: CVDisplayLink?
-           let error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink)
+                var displayLink: CVDisplayLink?
+                let error = CVDisplayLinkCreateWithCGDisplay(displayID, &displayLink)
 
-           if error == kCVReturnSuccess, let link = displayLink {
-               let actualRefreshRate = Double(CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link))
-               if actualRefreshRate > 0 {
-                   let timeScale = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link).timeScale
-                   if timeScale > 0 {
-                       // Convert to Hz (frames per second)
-                       let refreshRate = Double(timeScale) / actualRefreshRate
-                       screenRefreshRate = Float(refreshRate)
-                   }
-               }
-               CVDisplayLinkRelease(link)
-           } else {
-               // Fallback if we can't get the refresh rate
-               screenRefreshRate = 60.0
-           }
-       } else {
-           screenRefreshRate = 60.0
-       }
-       #endif
+                if error == kCVReturnSuccess, let link = displayLink {
+                    let actualRefreshRate = Double(
+                        CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link))
+                    if actualRefreshRate > 0 {
+                        let timeScale = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
+                            .timeScale
+                        if timeScale > 0 {
+                            // Convert to Hz (frames per second)
+                            let refreshRate = Double(timeScale) / actualRefreshRate
+                            screenRefreshRate = Float(refreshRate)
+                        }
+                    }
+                    CVDisplayLinkRelease(link)
+                } else {
+                    // Fallback if we can't get the refresh rate
+                    screenRefreshRate = 60.0
+                }
+            } else {
+                screenRefreshRate = 60.0
+            }
+        #endif
     }
 
     /// Detects the video's native frame rate from its asset
     private func detectVideoFrameRate(from asset: AVAsset) {
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            print("Video track not found for frame rate detection")
-            videoFrameRate = 30.0 // Default fallback
-            return
-        }
+        asset.loadTracks(withMediaType: .video) { [self] tracks, error in
+            guard let videoTrack = tracks?.first, error == nil else {
+                print(
+                    "Erreur lors du chargement des pistes vidéo : \(error?.localizedDescription ?? "Inconnue")"
+                )
+                return
 
-        videoFrameRate = Float(videoTrack.nominalFrameRate)
-        if videoFrameRate <= 0 {
-            // Fallback to common default if detection fails
-            videoFrameRate = 30.0
-        }
+            }
 
-        // Set capture rate to the lower of the two rates
-        updateCaptureFrameRate()
+            videoFrameRate = Float(videoTrack.nominalFrameRate)
+            if videoFrameRate <= 0 {
+                // Fallback to common default if detection fails
+                videoFrameRate = 30.0
+            }
+
+            // Set capture rate to the lower of the two rates
+            updateCaptureFrameRate()
+        }
     }
 
     /// Updates the capture frame rate based on screen and video rates
@@ -164,7 +172,7 @@ class SharedVideoPlayer {
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: frameWidth,
             kCVPixelBufferHeightKey as String: frameHeight,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
         ]
         videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
 
@@ -185,7 +193,7 @@ class SharedVideoPlayer {
 
     /// Captures initial frame to display without starting the display link
     private func captureInitialFrame() {
-        guard let output = videoOutput, let _ = player?.currentItem else { return }
+        guard let output = videoOutput, player?.currentItem != nil else { return }
 
         // Seek to the beginning to ensure we have a frame
         let zeroTime = CMTime.zero
@@ -193,38 +201,39 @@ class SharedVideoPlayer {
 
         // Try to get the first frame
         if output.hasNewPixelBuffer(forItemTime: zeroTime),
-           let pixelBuffer = output.copyPixelBuffer(forItemTime: zeroTime, itemTimeForDisplay: nil) {
+            let pixelBuffer = output.copyPixelBuffer(forItemTime: zeroTime, itemTimeForDisplay: nil)
+        {
             updateLatestFrameData(from: pixelBuffer)
         }
     }
 
     /// Configures the CADisplayLink with the appropriate frame rate
     private func configureDisplayLink() {
-        stopDisplayLink() // Ensure previous link is invalidated
+        stopDisplayLink()  // Ensure previous link is invalidated
 
         #if canImport(UIKit)
-        displayLink = CADisplayLink(target: self, selector: #selector(captureFrame))
+            displayLink = CADisplayLink(target: self, selector: #selector(captureFrame))
 
-        if #available(iOS 15.0, tvOS 15.0, *) {
-            // Modern API - set preferred frame rate directly
-            displayLink?.preferredFrameRateRange = CAFrameRateRange(
-                minimum: captureFrameRate,
-                maximum: captureFrameRate,
-                preferred: captureFrameRate
-            )
-        } else {
-            // Legacy API - use frame interval
-            let frameInterval = Int(round(screenRefreshRate / captureFrameRate))
-            displayLink?.preferredFramesPerSecond = Int(screenRefreshRate) / frameInterval
-        }
+            if #available(iOS 15.0, tvOS 15.0, *) {
+                // Modern API - set preferred frame rate directly
+                displayLink?.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: captureFrameRate,
+                    maximum: captureFrameRate,
+                    preferred: captureFrameRate
+                )
+            } else {
+                // Legacy API - use frame interval
+                let frameInterval = Int(round(screenRefreshRate / captureFrameRate))
+                displayLink?.preferredFramesPerSecond = Int(screenRefreshRate) / frameInterval
+            }
 
-        displayLink?.add(to: .main, forMode: .common)
+            displayLink?.add(to: .main, forMode: .common)
         #elseif os(macOS)
-        // For macOS, use a timer with the appropriate interval
-        let interval = 1.0 / Double(captureFrameRate)
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.captureFrame()
-        }
+            // For macOS, use a timer with the appropriate interval
+            let interval = 1.0 / Double(captureFrameRate)
+            Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+                self?.captureFrame()
+            }
         #endif
     }
 
@@ -237,12 +246,15 @@ class SharedVideoPlayer {
     /// Captures the latest frame from the video output if available.
     @objc private func captureFrame() {
         guard let output = videoOutput,
-              let item = player?.currentItem,
-              isPlaying == true else { return } // Skip capture if video is not playing
+            let item = player?.currentItem,
+            isPlaying == true
+        else { return }  // Skip capture if video is not playing
 
         let currentTime = item.currentTime()
         if output.hasNewPixelBuffer(forItemTime: currentTime),
-           let pixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
+            let pixelBuffer = output.copyPixelBuffer(
+                forItemTime: currentTime, itemTimeForDisplay: nil)
+        {
             updateLatestFrameData(from: pixelBuffer)
         }
     }
@@ -298,7 +310,8 @@ class SharedVideoPlayer {
     }
 
     /// Callback: Prepare the tap (called before processing).
-    private let tapPrepare: MTAudioProcessingTapPrepareCallback = { (tap, maxFrames, processingFormat) in
+    private let tapPrepare: MTAudioProcessingTapPrepareCallback = {
+        (tap, maxFrames, processingFormat) in
         // You can set up buffers or other resources here if needed.
     }
 
@@ -308,14 +321,16 @@ class SharedVideoPlayer {
     }
 
     /// Callback: Process audio. This is where you calculate the audio levels.
-    private let tapProcess: MTAudioProcessingTapProcessCallback = { (tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut) in
+    private let tapProcess: MTAudioProcessingTapProcessCallback = {
+        (tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut) in
         // Get the tap context (the SharedVideoPlayer instance)
         let opaqueSelf = MTAudioProcessingTapGetStorage(tap)
         let mySelf = Unmanaged<SharedVideoPlayer>.fromOpaque(opaqueSelf).takeUnretainedValue()
 
         var localFrames = numberFrames
         // Retrieve the audio buffers
-        let status = MTAudioProcessingTapGetSourceAudio(tap, localFrames, bufferListInOut, flagsOut, nil, nil)
+        let status = MTAudioProcessingTapGetSourceAudio(
+            tap, localFrames, bufferListInOut, flagsOut, nil, nil)
         if status != noErr {
             return
         }
@@ -324,7 +339,8 @@ class SharedVideoPlayer {
         let bufferList = bufferListInOut.pointee
         // Assuming interleaved float data (adjust if using a different format)
         if let mBuffers = bufferList.mBuffers.mData {
-            let data = mBuffers.bindMemory(to: Float.self, capacity: Int(bufferList.mBuffers.mDataByteSize/4))
+            let data = mBuffers.bindMemory(
+                to: Float.self, capacity: Int(bufferList.mBuffers.mDataByteSize / 4))
             let frameCount = Int(localFrames)
             var leftSum: Float = 0.0
             var rightSum: Float = 0.0
@@ -376,7 +392,8 @@ class SharedVideoPlayer {
 
         var tap: Unmanaged<MTAudioProcessingTap>?
         // Create the audio processing tap
-        let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
+        let status = MTAudioProcessingTapCreate(
+            kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
         if status == noErr, let tap = tap {
             inputParams.audioTapProcessor = tap.takeRetainedValue()
             let audioMix = AVMutableAudioMix()
@@ -386,7 +403,6 @@ class SharedVideoPlayer {
             print("Audio Tap creation failed with status: \(status)")
         }
     }
-
 
     /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
@@ -405,7 +421,9 @@ class SharedVideoPlayer {
         if let output = videoOutput, let item = player?.currentItem {
             let currentTime = item.currentTime()
             if output.hasNewPixelBuffer(forItemTime: currentTime),
-               let pixelBuffer = output.copyPixelBuffer(forItemTime: currentTime, itemTimeForDisplay: nil) {
+                let pixelBuffer = output.copyPixelBuffer(
+                    forItemTime: currentTime, itemTimeForDisplay: nil)
+            {
                 updateLatestFrameData(from: pixelBuffer)
             }
         }
@@ -413,7 +431,7 @@ class SharedVideoPlayer {
 
     /// Sets the volume level (0.0 to 1.0)
     func setVolume(level: Float) {
-        volume = max(0.0, min(1.0, level)) // Clamp between 0.0 and 1.0
+        volume = max(0.0, min(1.0, level))  // Clamp between 0.0 and 1.0
         player?.volume = volume
     }
 
@@ -463,7 +481,9 @@ class SharedVideoPlayer {
         // Update frame at the new position if paused
         if !isPlaying, let output = videoOutput {
             if output.hasNewPixelBuffer(forItemTime: newTime),
-               let pixelBuffer = output.copyPixelBuffer(forItemTime: newTime, itemTimeForDisplay: nil) {
+                let pixelBuffer = output.copyPixelBuffer(
+                    forItemTime: newTime, itemTimeForDisplay: nil)
+            {
                 updateLatestFrameData(from: pixelBuffer)
             }
         }
@@ -493,8 +513,9 @@ public func createVideoPlayer() -> UnsafeMutableRawPointer? {
 @_cdecl("openUri")
 public func openUri(_ context: UnsafeMutableRawPointer?, _ uri: UnsafePointer<CChar>?) {
     guard let context = context,
-          let uriCStr = uri,
-          let swiftUri = String(validatingUTF8: uriCStr) else {
+        let uriCStr = uri,
+        let swiftUri = String(validatingUTF8: uriCStr)
+    else {
         print("Invalid parameters for openUri")
         return
     }
