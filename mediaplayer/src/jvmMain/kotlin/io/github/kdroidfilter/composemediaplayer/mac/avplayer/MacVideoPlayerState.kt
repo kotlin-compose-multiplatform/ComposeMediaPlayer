@@ -36,6 +36,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     internal val currentFrameState: State<ImageBitmap?> = _currentFrameState
     private var frameUpdateJob: Job? = null
     private var bufferedImage: BufferedImage? = null
+    private var bufferingCheckJob: Job? = null
+    private var lastFrameUpdateTime: Long = 0
 
     override var hasMedia: Boolean by mutableStateOf(false)
     override var isPlaying: Boolean by mutableStateOf(false)
@@ -54,6 +56,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     private var seekInProgress = false
     private var targetSeekTime: Double? = null
+    private var lastFrameHash: Int = 0
 
     override var sliderPos: Float by mutableStateOf(0.0f)
     override var userDragging: Boolean by mutableStateOf(false)
@@ -89,6 +92,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         get() = if (captureFrameRate > 0) (1000.0f / captureFrameRate).toLong() else 33L
 
     private var playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    // Buffering detection constants
+    private val bufferingCheckInterval = 100L // Check every 100ms
+    private val bufferingTimeoutThreshold = 500L // Consider buffering if no frame update for 500ms
 
     init {
         macLogger.d { "Initializing video player" }
@@ -139,6 +146,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 if (hasMedia) {
                     pause()  // Stop the current audio playback
                     stopFrameUpdates()
+                    stopBufferingCheck()
 
                     // Dispose the current player instance
                     playerPtr?.let {
@@ -164,6 +172,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 isPlaying = true
                 startFrameUpdates()
                 updateFrame()
+                startBufferingCheck()
 
                 if (isPlaying) {
                     play()
@@ -216,6 +225,52 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     }
 
     /**
+     * Starts periodic checks for buffering state.
+     */
+    private fun startBufferingCheck() {
+        macLogger.d { "startBufferingCheck() - Starting buffering detection" }
+        stopBufferingCheck()
+        bufferingCheckJob = playerScope.launch {
+            while (isActive) {
+                if (isPlaying && !isLoading) {
+                    val currentTime = System.currentTimeMillis()
+                    val timeSinceLastFrame = currentTime - lastFrameUpdateTime
+
+                    if (timeSinceLastFrame > bufferingTimeoutThreshold) {
+                        macLogger.d { "Buffering detected: $timeSinceLastFrame ms since last frame update" }
+                        isLoading = true
+                    }
+                }
+                delay(bufferingCheckInterval)
+            }
+        }
+    }
+
+    /**
+     * Stops buffering check job.
+     */
+    private fun stopBufferingCheck() {
+        macLogger.d { "stopBufferingCheck() - Stopping buffering detection" }
+        bufferingCheckJob?.cancel()
+        bufferingCheckJob = null
+    }
+
+    /**
+     * Calculates a simple hash of the image data to detect if the frame has changed.
+     */
+    private fun calculateFrameHash(data: IntArray): Int {
+        var hash = 0
+        // Sample a subset of pixels for performance
+        val step = data.size / 100
+        if (step > 0) {
+            for (i in 0 until data.size step step) {
+                hash = 31 * hash + data[i]
+            }
+        }
+        return hash
+    }
+
+    /**
      * Updates the current video frame.
      */
     private fun updateFrame() {
@@ -233,8 +288,24 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     val pixels = (bufferedImage!!.raster.dataBuffer as DataBufferInt).data
                     framePtr.getByteBuffer(0, (width * height * 4).toLong())
                         .asIntBuffer().get(pixels)
+
+                    // Calculate frame hash to detect changes
+                    val newHash = calculateFrameHash(pixels)
+                    val frameChanged = newHash != lastFrameHash
+                    lastFrameHash = newHash
+
                     _currentFrameState.value = bufferedImage!!.toComposeImageBitmap()
-                    macLogger.d { "updateFrame() - Frame updated" }
+
+                    // If the frame changed, update timestamp and potentially end loading state
+                    if (frameChanged) {
+                        lastFrameUpdateTime = System.currentTimeMillis()
+                        if (isLoading && !seekInProgress) {
+                            macLogger.d { "Frame updated, ending loading state" }
+                            isLoading = false
+                        }
+                    }
+
+                    macLogger.d { "updateFrame() - Frame updated, changed: $frameChanged" }
                 } ?: macLogger.d { "updateFrame() - No frame available" }
             } else {
                 macLogger.d { "updateFrame() - Invalid dimensions" }
@@ -256,6 +327,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     if (abs(current - targetSeekTime!!) < 0.3) {
                         seekInProgress = false
                         targetSeekTime = null
+                        isLoading = false
+                        macLogger.d { "Seek completed, resetting loading state" }
                     }
                 } else {
                     // Conversion to a 0..1000 scale for the Compose slider
@@ -297,6 +370,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             isPlaying = true
             macLogger.d { "play() - Playback started, initiating frame updates" }
             startFrameUpdates()
+            startBufferingCheck()
         } ?: macLogger.d { "play() - playerPtr is null" }
     }
 
@@ -305,9 +379,11 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         playerPtr?.let {
             SharedVideoPlayer.INSTANCE.pauseVideo(it)
             isPlaying = false
+            isLoading = false  // Reset loading state when paused
             macLogger.d { "pause() - Playback paused, updating frame immediately" }
             playerScope.launch { updateFrame() }
             stopFrameUpdates() // Stop frame update job
+            stopBufferingCheck() // Stop buffering check
         } ?: macLogger.d { "pause() - playerPtr is null" }
     }
 
@@ -319,10 +395,12 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     override fun seekTo(value: Float) {
         macLogger.d { "seekTo() - Seeking with slider value: $value" }
+        isLoading = true  // Set loading state when seeking starts
         playerScope.launch {
             val duration = getDuration()
             if (duration <= 0) {
                 macLogger.d { "seekTo() - Invalid duration, aborting seek" }
+                isLoading = false
                 return@launch
             }
             val seekTime = ((value / 1000f) * duration.toFloat()).coerceIn(0f, duration.toFloat())
@@ -330,6 +408,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             seekInProgress = true
             targetSeekTime = seekTime.toDouble()
             sliderPos = value
+            lastFrameUpdateTime = System.currentTimeMillis()  // Reset time tracking
 
             playerPtr?.let {
                 macLogger.d { "seekTo() - Calling seekTo on native player" }
@@ -345,13 +424,19 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 delay(100)
                 updateFrame()
 
-                // If after 500 ms the seek is still not completed, force its end
+                // If after 3000 ms the seek is still not completed, force its end but keep loading state
                 launch {
-                    delay(500)
+                    delay(3000)
                     if (seekInProgress) {
                         macLogger.d { "seekTo() - Forcing end of seek after timeout" }
                         seekInProgress = false
                         targetSeekTime = null
+                        // Keep isLoading true if we haven't seen frame updates
+                        val currentTime = System.currentTimeMillis()
+                        val timeSinceLastFrame = currentTime - lastFrameUpdateTime
+                        if (timeSinceLastFrame < bufferingTimeoutThreshold) {
+                            isLoading = false
+                        }
                     }
                 }
             }
@@ -361,6 +446,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override fun dispose() {
         macLogger.d { "dispose() - Releasing resources" }
         stopFrameUpdates()
+        stopBufferingCheck()
         playerScope.cancel()
         playerPtr?.let {
             macLogger.d { "dispose() - Disposing native player" }
@@ -377,6 +463,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         macLogger.d { "resetState() - Resetting state" }
         hasMedia = false
         isPlaying = false
+        isLoading = false
         _currentFrameState.value = null
         bufferedImage = null
     }
@@ -435,6 +522,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override fun hideMedia() {
         macLogger.d { "hideMedia() - Hiding media" }
         stopFrameUpdates()
+        stopBufferingCheck()
         _currentFrameState.value = null
     }
 
@@ -442,7 +530,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         macLogger.d { "showMedia() - Showing media" }
         if (hasMedia) {
             updateFrame()
-            if (isPlaying) startFrameUpdates()
+            if (isPlaying) {
+                startFrameUpdates()
+                startBufferingCheck()
+            }
         }
     }
 }
