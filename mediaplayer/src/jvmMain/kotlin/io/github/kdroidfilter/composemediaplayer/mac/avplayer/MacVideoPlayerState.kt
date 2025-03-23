@@ -42,6 +42,12 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     internal val currentFrameState: State<ImageBitmap?> = mutableStateOf(null)
     private var _bufferImage: BufferedImage? = null
 
+    // Audio level state variables (added for left and right levels)
+    private val _leftLevel = mutableStateOf(0.0f)
+    private val _rightLevel = mutableStateOf(0.0f)
+    override val leftLevel: Float get() = _leftLevel.value
+    override val rightLevel: Float get() = _rightLevel.value
+
     // Background worker threads and jobs
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var playerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -64,8 +70,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override var sliderPos: Float by mutableStateOf(0.0f)
     override var userDragging: Boolean by mutableStateOf(false)
     override var loop: Boolean by mutableStateOf(false)
-    override val leftLevel: Float by mutableStateOf(0.0f)
-    override val rightLevel: Float by mutableStateOf(0.0f)
     override var isLoading: Boolean by mutableStateOf(false)
     override var error: VideoPlayerError? by mutableStateOf(null)
     override var subtitlesEnabled: Boolean by mutableStateOf(false)
@@ -102,9 +106,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         get() = if (captureFrameRate > 0) {
             (1000.0f / captureFrameRate).toLong()
         } else {
-            33L  // Valeur par défaut (en ms) si aucune valeur valide n'est renvoyée
+            33L  // Default value (in ms) if no valid capture rate is provided
         }
-
 
     // Buffering detection constants
     private val bufferingCheckInterval = 200L // Increased from 100ms to reduce CPU usage
@@ -127,7 +130,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         uiUpdateJob?.cancel()
         uiUpdateJob = ioScope.launch {
             _currentFrameState
-                .debounce(33) // Decreased from 16ms to 33ms (30fps max) to reduce UI pressure
+                .debounce(33) // Reduced from 16ms to 33ms (max 30fps) to reduce UI load
                 .collect { newFrame ->
                     ensureActive() // Check if coroutine is still active
                     withContext(Dispatchers.Main) {
@@ -137,7 +140,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Initializes the native video player on IO thread. */
+    /** Initializes the native video player on the IO thread. */
     private suspend fun initPlayer() = ioScope.launch {
         macLogger.d { "initPlayer() - Creating native player" }
         try {
@@ -185,14 +188,14 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 error = null  // Clear any previous errors
             }
 
-            // Ensure all heavy operations are in background
+            // Ensure heavy operations are performed in the background
             try {
                 // Stop and clean up any existing playback
                 if (hasMedia) {
                     cleanupCurrentPlayback()
                 }
 
-                // Ensure player is initialized in background
+                // Ensure player is initialized in the background
                 ensurePlayerInitialized()
 
                 // Open URI on IO thread and capture result
@@ -215,13 +218,13 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     // Start background processes for frame updates
                     startFrameUpdates()
 
-                    // First frame update in background
+                    // First frame update in the background
                     updateFrameAsync()
 
-                    // Start buffering check in background
+                    // Start buffering check in the background
                     startBufferingCheck()
 
-                    // Start playback if needed - in background
+                    // Start playback if needed - in the background
                     if (isPlaying) {
                         playInBackground()
                     }
@@ -252,7 +255,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             ptr
         }
 
-        // Release resources outside of mutex lock
+        // Release resources outside of the mutex lock
         ptrToDispose?.let {
             try {
                 SharedVideoPlayer.INSTANCE.disposeVideoPlayer(it)
@@ -262,7 +265,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Ensures player is initialized. */
+    /** Ensures the player is initialized. */
     private suspend fun ensurePlayerInitialized() {
         macLogger.d { "ensurePlayerInitialized() - Ensuring player is initialized" }
         if (!playerScope.isActive) {
@@ -282,14 +285,14 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Opens media URI and returns success state. */
+    /** Opens media URI and returns a success flag. */
     private suspend fun openMediaUri(uri: String): Boolean {
         macLogger.d { "openMediaUri() - Opening URI: $uri" }
         val ptr = mainMutex.withLock { playerPtr } ?: return false
 
         return try {
             SharedVideoPlayer.INSTANCE.openUri(ptr, uri)
-            // Wait a small amount of time for initialization
+            // Wait a short time for initialization
             delay(100)
             true
         } catch (e: Exception) {
@@ -332,7 +335,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Starts periodic frame updates on background thread. */
+    /** Starts periodic frame updates on a background thread. */
     private fun startFrameUpdates() {
         macLogger.d { "startFrameUpdates() - Starting frame updates" }
         stopFrameUpdates()
@@ -355,7 +358,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         frameUpdateJob = null
     }
 
-    /** Starts periodic checks for buffering state on background thread. */
+    /** Starts periodic buffering detection on a background thread. */
     private fun startBufferingCheck() {
         macLogger.d { "startBufferingCheck() - Starting buffering detection" }
         stopBufferingCheck()
@@ -368,7 +371,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Checks if media is currently buffering. */
+    /** Checks if the media is currently buffering. */
     private suspend fun checkBufferingState() {
         if (isPlaying && !isLoading) {
             val currentTime = System.currentTimeMillis()
@@ -383,7 +386,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Stops buffering check job. */
+    /** Stops the buffering detection job. */
     private fun stopBufferingCheck() {
         macLogger.d { "stopBufferingCheck() - Stopping buffering detection" }
         bufferingCheckJob?.cancel()
@@ -392,13 +395,13 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
     /**
      * Calculates a simple hash of the image data to detect if the frame has
-     * changed. Running in compute dispatcher for CPU-intensive work. Optimized
-     * to sample fewer pixels to improve performance.
+     * changed. This runs on the compute dispatcher for CPU-intensive work and
+     * samples fewer pixels for better performance.
      */
     private suspend fun calculateFrameHash(data: IntArray): Int = withContext(Dispatchers.Default) {
         var hash = 0
-        // Sample a smaller subset of pixels for better performance
-        val step = data.size / 200 // Increased from 100 to 200 to sample fewer pixels
+        // Sample a smaller subset of pixels for performance
+        val step = data.size / 200
         if (step > 0) {
             for (i in 0 until data.size step step) {
                 hash = 31 * hash + data[i]
@@ -407,10 +410,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         hash
     }
 
-    /** Updates the current video frame on background thread. */
+    /** Updates the current video frame on a background thread. */
     private suspend fun updateFrameAsync() {
         try {
-            // Get player pointer safely
+            // Safely get the player pointer
             val ptr = mainMutex.withLock { playerPtr } ?: return
 
             // Get frame dimensions
@@ -421,10 +424,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 return
             }
 
-            // Get latest frame - do this before creating buffer to minimize mutex lock time
+            // Get the latest frame to minimize mutex lock time
             val framePtr = SharedVideoPlayer.INSTANCE.getLatestFrame(ptr) ?: return
 
-            // Create or reuse buffered image on compute thread
+            // Create or reuse a buffered image on a compute thread
             val bufferedImage = withContext(Dispatchers.Default) {
                 val existingBuffer = mainMutex.withLock { _bufferImage }
                 if (existingBuffer == null || existingBuffer.width != width || existingBuffer.height != height) {
@@ -436,7 +439,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
 
-            // Copy frame data on compute thread for better performance
+            // Copy frame data on a compute thread for performance
             withContext(Dispatchers.Default) {
                 val pixels = (bufferedImage.raster.dataBuffer as DataBufferInt).data
                 framePtr.getByteBuffer(0, (width * height * 4).toLong())
@@ -451,13 +454,13 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     // Update timestamp
                     lastFrameUpdateTime = System.currentTimeMillis()
 
-                    // Convert to ImageBitmap on compute thread
+                    // Convert to ImageBitmap on a compute thread
                     val imageBitmap = bufferedImage.toComposeImageBitmap()
 
                     // Publish to flow
                     _currentFrameState.value = imageBitmap
 
-                    // Update loading state if needed - on main thread
+                    // Update loading state if needed on the main thread
                     if (isLoading && !seekInProgress) {
                         withContext(Dispatchers.Main) {
                             isLoading = false
@@ -470,7 +473,10 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Updates the playback position and slider on background thread. */
+    /**
+     * Updates the playback position, slider, and audio levels on a background
+     * thread.
+     */
     private suspend fun updatePositionAsync() {
         if (!hasMedia || userDragging) return
 
@@ -480,10 +486,25 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
             val current = getPositionSafely()
 
-            // Update time text display
+            // Update time text display on the main thread
             withContext(Dispatchers.Main) {
                 _positionText.value = formatTime(current)
                 _durationText.value = formatTime(duration)
+            }
+
+            // Update left and right audio levels from the native player
+            val ptr = mainMutex.withLock { playerPtr }
+            if (ptr != null) {
+                try {
+                    val newLeft = SharedVideoPlayer.INSTANCE.getLeftAudioLevel(ptr)
+                    val newRight = SharedVideoPlayer.INSTANCE.getRightAudioLevel(ptr)
+                    withContext(Dispatchers.Main) {
+                        _leftLevel.value = newLeft
+                        _rightLevel.value = newRight
+                    }
+                } catch (e: Exception) {
+                    macLogger.e { "Error retrieving audio levels: ${e.message}" }
+                }
             }
 
             // Handle seek in progress
@@ -497,7 +518,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     macLogger.d { "Seek completed, resetting loading state" }
                 }
             } else {
-                // Update slider position - batch with other UI updates to reduce UI thread calls
+                // Update slider position, batched with other UI updates to reduce main thread calls
                 val newSliderPos = (current / duration * 1000).toFloat().coerceIn(0f, 1000f)
                 withContext(Dispatchers.Main) {
                     sliderPos = newSliderPos
@@ -522,7 +543,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 withContext(Dispatchers.Main) {
                     isPlaying = false
                 }
-
                 // Ensure native player state is consistent
                 pauseInBackground()
             }
@@ -532,11 +552,19 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override fun play() {
         macLogger.d { "play() - Starting playback" }
         ioScope.launch {
-            playInBackground()
+            if (hasMedia) {
+                playInBackground()
+            } else {
+                // If no media, ensure loading state is false
+                withContext(Dispatchers.Main) {
+                    isPlaying = false
+                    isLoading = false
+                }
+            }
         }
     }
 
-    /** Plays video in background. */
+    /** Plays video on a background thread. */
     private suspend fun playInBackground() {
         val ptr = mainMutex.withLock { playerPtr } ?: return
 
@@ -562,7 +590,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Pauses video in background. */
+    /** Pauses video on a background thread. */
     private suspend fun pauseInBackground() {
         val ptr = mainMutex.withLock { playerPtr } ?: return
 
@@ -586,7 +614,13 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         macLogger.d { "stop() - Stopping playback" }
         ioScope.launch {
             pauseInBackground()
-            seekToAsync(0f)
+            if (hasMedia) {
+                seekToAsync(0f)
+            }
+            withContext(Dispatchers.Main) {
+                hasMedia = false
+                isLoading = false
+            }
         }
     }
 
@@ -599,7 +633,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Seeks to position in background. */
+    /** Seeks to a position on a background thread. */
     private suspend fun seekToAsync(value: Float) {
         withContext(Dispatchers.Main) {
             isLoading = true
@@ -630,11 +664,11 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             if (isPlaying) {
                 SharedVideoPlayer.INSTANCE.playVideo(ptr)
 
-                // Force frame update after seek
+                // Force a frame update after seek
                 delay(50)
                 updateFrameAsync()
 
-                // Timeout for seek operation
+                // Timeout for the seek operation
                 ioScope.launch {
                     delay(2000) // Reduced from 3000ms
                     if (seekInProgress) {
@@ -676,7 +710,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 ptr
             }
 
-            // Dispose native resources outside mutex lock
+            // Dispose native resources outside the mutex lock
             ptrToDispose?.let {
                 macLogger.d { "dispose() - Disposing native player" }
                 try {
@@ -688,7 +722,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
             resetState()
 
-            // Clear buffer image
+            // Clear buffered image
             mainMutex.withLock {
                 _bufferImage = null
             }
@@ -743,7 +777,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Applies volume setting to native player. */
+    /** Applies the volume setting to the native player. */
     private suspend fun applyVolume() {
         val ptr = mainMutex.withLock { playerPtr } ?: return
         try {

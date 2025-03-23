@@ -25,6 +25,8 @@ internal interface SharedVideoPlayer : Library {
     fun getCurrentTime(context: Pointer?): Double
     fun seekTo(context: Pointer?, time: Double)
     fun disposeVideoPlayer(context: Pointer?)
+    fun getLeftAudioLevel(context: Pointer?): Float
+    fun getRightAudioLevel(context: Pointer?): Float
 
     companion object {
         val INSTANCE: SharedVideoPlayer =

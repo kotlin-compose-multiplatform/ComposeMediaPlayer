@@ -41,6 +41,11 @@ class SharedVideoPlayer {
     // Flag to track if playback is active
     private var isPlaying: Bool = false
 
+    ///Two properties to store the left and right audio levels.
+    private var leftAudioLevel: Float = 0.0
+    private var rightAudioLevel: Float = 0.0
+
+
     init() {
         // Detect screen refresh rate
         detectScreenRefreshRate()
@@ -175,6 +180,8 @@ class SharedVideoPlayer {
         }
         player = AVPlayer(playerItem: item)
 
+        setupAudioTap(for: item)
+
         // Set initial volume
         player?.volume = volume
 
@@ -273,6 +280,119 @@ class SharedVideoPlayer {
             }
         }
     }
+
+    /// Retrieve the audio levels.
+    func getLeftAudioLevel() -> Float {
+        return leftAudioLevel
+    }
+
+    func getRightAudioLevel() -> Float {
+        return rightAudioLevel
+    }
+
+    // MARK: - Audio Tap Callbacks
+
+    /// Callback: Initialization of the tap.
+    private let tapInit: MTAudioProcessingTapInitCallback = { (tap, clientInfo, tapStorageOut) in
+        // Initialize tap storage (e.g. to store cumulative values if needed)
+        tapStorageOut.pointee = clientInfo
+    }
+
+    /// Callback: Finalize the tap.
+    private let tapFinalize: MTAudioProcessingTapFinalizeCallback = { (tap) in
+        // Cleanup if necessary.
+    }
+
+    /// Callback: Prepare the tap (called before processing).
+    private let tapPrepare: MTAudioProcessingTapPrepareCallback = { (tap, maxFrames, processingFormat) in
+        // You can set up buffers or other resources here if needed.
+    }
+
+    /// Callback: Unprepare the tap (called after processing).
+    private let tapUnprepare: MTAudioProcessingTapUnprepareCallback = { (tap) in
+        // Release any resources allocated in prepare.
+    }
+
+    /// Callback: Process audio. This is where you calculate the audio levels.
+    private let tapProcess: MTAudioProcessingTapProcessCallback = { (tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut) in
+        // Get the tap context (the SharedVideoPlayer instance)
+        let opaqueSelf = MTAudioProcessingTapGetStorage(tap)
+        let mySelf = Unmanaged<SharedVideoPlayer>.fromOpaque(opaqueSelf).takeUnretainedValue()
+
+        var localFrames = numberFrames
+        // Retrieve the audio buffers
+        let status = MTAudioProcessingTapGetSourceAudio(tap, localFrames, bufferListInOut, flagsOut, nil, nil)
+        if status != noErr {
+            return
+        }
+
+        // Process the audio buffers to calculate left and right channel levels.
+        let bufferList = bufferListInOut.pointee
+        // Assuming interleaved float data (adjust if using a different format)
+        if let mBuffers = bufferList.mBuffers.mData {
+            let data = mBuffers.bindMemory(to: Float.self, capacity: Int(bufferList.mBuffers.mDataByteSize/4))
+            let frameCount = Int(localFrames)
+            var leftSum: Float = 0.0
+            var rightSum: Float = 0.0
+            var leftCount = 0
+            var rightCount = 0
+
+            // Assuming stereo (2 channels)
+            for frame in 0..<frameCount {
+                let leftSample = data[frame * 2]
+                let rightSample = data[frame * 2 + 1]
+                leftSum += abs(leftSample)
+                rightSum += abs(rightSample)
+                leftCount += 1
+                rightCount += 1
+            }
+
+            // Calculate average level for each channel
+            let avgLeft = leftCount > 0 ? leftSum / Float(leftCount) : 0.0
+            let avgRight = rightCount > 0 ? rightSum / Float(rightCount) : 0.0
+
+            // Update the properties (if needed, you might want to convert to dB)
+            mySelf.leftAudioLevel = avgLeft
+            mySelf.rightAudioLevel = avgRight
+        }
+
+        numberFramesOut.pointee = localFrames
+    }
+
+    /// Setup audio tap on the AVPlayerItem to process audio samples.
+    /// Call this function after creating your AVPlayerItem.
+    private func setupAudioTap(for playerItem: AVPlayerItem) {
+        guard let asset = playerItem.asset as? AVURLAsset else { return }
+        // Get the first audio track
+        guard let audioTrack = asset.tracks(withMediaType: .audio).first else { return }
+
+        // Create input parameters with a processing tap
+        let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
+
+        // Define tap callbacks in English
+        var callbacks = MTAudioProcessingTapCallbacks(
+            version: kMTAudioProcessingTapCallbacksVersion_0,
+            clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            init: tapInit,
+            finalize: tapFinalize,
+            prepare: tapPrepare,
+            unprepare: tapUnprepare,
+            process: tapProcess
+        )
+
+        var tap: Unmanaged<MTAudioProcessingTap>?
+        // Create the audio processing tap
+        let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
+        if status == noErr, let tap = tap {
+            inputParams.audioTapProcessor = tap.takeRetainedValue()
+            let audioMix = AVMutableAudioMix()
+            audioMix.inputParameters = [inputParams]
+            playerItem.audioMix = audioMix
+        } else {
+            print("Audio Tap creation failed with status: \(status)")
+        }
+    }
+
 
     /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
@@ -499,4 +619,18 @@ public func disposeVideoPlayer(_ context: UnsafeMutableRawPointer?) {
     DispatchQueue.main.async {
         player.dispose()
     }
+}
+
+@_cdecl("getLeftAudioLevel")
+public func getLeftAudioLevel(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getLeftAudioLevel()
+}
+
+@_cdecl("getRightAudioLevel")
+public func getRightAudioLevel(_ context: UnsafeMutableRawPointer?) -> Float {
+    guard let context = context else { return 0.0 }
+    let player = Unmanaged<SharedVideoPlayer>.fromOpaque(context).takeUnretainedValue()
+    return player.getRightAudioLevel()
 }
