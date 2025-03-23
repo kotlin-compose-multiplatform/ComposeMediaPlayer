@@ -79,7 +79,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     override val metadata: VideoMetadata = VideoMetadata()
     private var lastUri: String? = null
 
-
     // Non-blocking text properties
     private val _positionText = mutableStateOf("")
     override val positionText: String get() = _positionText.value
@@ -159,6 +158,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Exception in initPlayer: ${e.message}" }
             withContext(Dispatchers.Main) {
                 error = VideoPlayerError.UnknownError("Failed to initialize player: ${e.message}")
@@ -177,6 +177,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             captureFrameRate = SharedVideoPlayer.INSTANCE.getCaptureFrameRate(ptr)
             macLogger.d { "Frame Rates - Video: $videoFrameRate, Screen: $screenRefreshRate, Capture: $captureFrameRate" }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error updating frame rate info: ${e.message}" }
         }
     }
@@ -241,6 +242,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                     }
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 macLogger.e { "openUri() - Exception: ${e.message}" }
                 handleError(e)
             }
@@ -265,6 +267,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             try {
                 SharedVideoPlayer.INSTANCE.disposeVideoPlayer(it)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 macLogger.e { "Error disposing player: ${e.message}" }
             }
         }
@@ -301,6 +304,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             delay(100)
             true
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Failed to open URI: ${e.message}" }
             false
         }
@@ -336,6 +340,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
             macLogger.d { "Metadata updated: $metadata" }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error updating metadata: ${e.message}" }
         }
     }
@@ -408,7 +413,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         // Sample a smaller subset of pixels for performance
         val step = data.size / 200
         if (step > 0) {
-            for (i in 0 until data.size step step) {
+            for (i in data.indices step step) {
                 hash = 31 * hash + data[i]
             }
         }
@@ -474,6 +479,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "updateFrameAsync() - Exception: ${e.message}" }
         }
     }
@@ -508,6 +514,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                         _rightLevel.value = newRight
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     macLogger.e { "Error retrieving audio levels: ${e.message}" }
                 }
             }
@@ -533,6 +540,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             // Check for looping
             checkLoopingAsync(current, duration)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error in updatePositionAsync: ${e.message}" }
         }
     }
@@ -554,7 +562,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-
     override fun play() {
         macLogger.d { "play() - Starting playback" }
         ioScope.launch {
@@ -574,7 +581,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-
     /** Plays video on a background thread. */
     private suspend fun playInBackground() {
         val ptr = mainMutex.withLock { playerPtr } ?: return
@@ -589,6 +595,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             startFrameUpdates()
             startBufferingCheck()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error in playInBackground: ${e.message}" }
             handleError(e)
         }
@@ -617,6 +624,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             stopFrameUpdates()
             stopBufferingCheck()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error in pauseInBackground: ${e.message}" }
         }
     }
@@ -696,6 +704,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error in seekToAsync: ${e.message}" }
             withContext(Dispatchers.Main) {
                 isLoading = false
@@ -727,6 +736,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 try {
                     SharedVideoPlayer.INSTANCE.disposeVideoPlayer(it)
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     macLogger.e { "Error disposing player: ${e.message}" }
                 }
             }
@@ -772,6 +782,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         return try {
             SharedVideoPlayer.INSTANCE.getCurrentTime(ptr)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error getting position: ${e.message}" }
             0.0
         }
@@ -783,6 +794,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         return try {
             SharedVideoPlayer.INSTANCE.getVideoDuration(ptr)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error getting duration: ${e.message}" }
             0.0
         }
@@ -794,6 +806,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         try {
             SharedVideoPlayer.INSTANCE.setVolume(ptr, _volume)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             macLogger.e { "Error applying volume: ${e.message}" }
         }
     }
