@@ -23,8 +23,8 @@ Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/Compo
 - **Error handling** Simple error handling for network or playback issues.
 
 ## ✨ Supported Video Formats
-| Format | Windows (MFPlay) | Linux (GStreamer) | macOS & iOS (AVPlayer)                                                      | Android (Media3) | WasmJS (HTML5 Video) |
-|--------|------------------|-------------------|-----------------------------------------------------------------------------|------------------|---------------------|
+| Format | Windows | Linux  | macOS & iOS                                                       | Android | WasmJS |
+|--------|-----------------|-------------------|-----------------------------------------------------------------------------|-----------------|-------------------|
 | **Player** | [MFPlay](https://learn.microsoft.com/en-us/windows/win32/medfound/using-mfplay-for-audio-video-playback) | [GStreamer](https://gstreamer.freedesktop.org/) | [AVPlayer](https://developer.apple.com/documentation/avfoundation/avplayer) | [Media 3](https://developer.android.com/media/media3) | [HTML5 Video](https://www.w3schools.com/html/html5_video.asp) |
 | MP4 (H.264) | ✅ | ✅ | ✅                                                                           | ✅ | ✅ |
 | AVI | ✅ | ✅ | ❌                                                                           | ❌ | ❌ |
