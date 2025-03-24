@@ -25,7 +25,7 @@ import kotlin.math.abs
 
 // Initialize logger using Kermit
 internal val macLogger = Logger.withTag("MacVideoPlayerState")
-    .apply { setMinSeverity(Severity.Warn) }
+//    .apply { setMinSeverity(Severity.Warn) }
 
 /**
  * MacVideoPlayerState handles the native Mac video player state.
@@ -90,13 +90,15 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     internal val aspectRatio: Float get() = _aspectRatio.value
 
     // Player settings
-    private var _volume: Float = 1.0f
+    // Volume variable is stored independently so it can always be modified.
+    private val _volumeState = mutableStateOf(1.0f)
     override var volume: Float
-        get() = _volume
+        get() = _volumeState.value
         set(value) {
             val newValue = value.coerceIn(0f, 1f)
-            if (_volume != newValue) {
-                _volume = newValue
+            if (_volumeState.value != newValue) {
+                _volumeState.value = newValue
+                // Launch a coroutine to apply the volume if the native player is available.
                 ioScope.launch {
                     applyVolume()
                 }
@@ -130,9 +132,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     private fun startUIUpdateJob() {
         uiUpdateJob?.cancel()
         uiUpdateJob = ioScope.launch {
-            _currentFrameState
-                .debounce(16)
-                .collect { newFrame ->
+            _currentFrameState.debounce(16).collect { newFrame ->
                     ensureActive() // Check if coroutine is still active
                     withContext(Dispatchers.Main) {
                         (currentFrameState as MutableState).value = newFrame
@@ -321,10 +321,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             val frameRate = SharedVideoPlayer.INSTANCE.getVideoFrameRate(ptr)
 
             // Calculate aspect ratio
-            val newAspectRatio = if (width > 0 && height > 0)
-                width.toFloat() / height.toFloat()
-            else
-                16f / 9f
+            val newAspectRatio = if (width > 0 && height > 0) width.toFloat() / height.toFloat()
+            else 16f / 9f
 
             withContext(Dispatchers.Main) {
                 // Update metadata
@@ -453,8 +451,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             // Copy frame data on a compute thread for performance
             withContext(Dispatchers.Default) {
                 val pixels = (bufferedImage.raster.dataBuffer as DataBufferInt).data
-                framePtr.getByteBuffer(0, (width * height * 4).toLong())
-                    .asIntBuffer().get(pixels)
+                framePtr.getByteBuffer(0, (width * height * 4).toLong()).asIntBuffer().get(pixels)
 
                 // Calculate frame hash to detect changes
                 val newHash = calculateFrameHash(pixels)
@@ -811,14 +808,21 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
-    /** Applies the volume setting to the native player. */
+    /**
+     * Applies the current volume setting to the native player. If no player
+     * is available, the volume is simply stored in _volumeState and will be
+     * applied when the player is initialized.
+     */
     private suspend fun applyVolume() {
-        val ptr = mainMutex.withLock { playerPtr } ?: return
-        try {
-            SharedVideoPlayer.INSTANCE.setVolume(ptr, _volume)
-        } catch (e: Exception) {
-            if (e is CancellationException) throw e
-            macLogger.e { "Error applying volume: ${e.message}" }
+        mainMutex.withLock {
+            playerPtr?.let { ptr ->
+                try {
+                    SharedVideoPlayer.INSTANCE.setVolume(ptr, _volumeState.value)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    macLogger.e { "Error applying volume: ${e.message}" }
+                }
+            }
         }
     }
 
