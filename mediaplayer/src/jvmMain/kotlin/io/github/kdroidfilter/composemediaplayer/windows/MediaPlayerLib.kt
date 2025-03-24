@@ -26,9 +26,7 @@ internal interface MediaPlayerLib : StdCallLibrary {
         // Singleton instance
         val INSTANCE: MediaPlayerLib by lazy {
             try {
-                Native.load("simpleplayer", MediaPlayerLib::class.java).also {
-                    logger.debug{ "MediaPlayerLib loaded successfully" }
-                }
+                Native.load("NativeVideoPlayer", MediaPlayerLib::class.java)
             } catch (e: Exception) {
                 e.printStackTrace()
                 throw RuntimeException("Failed to load simpleplayer library", e)
