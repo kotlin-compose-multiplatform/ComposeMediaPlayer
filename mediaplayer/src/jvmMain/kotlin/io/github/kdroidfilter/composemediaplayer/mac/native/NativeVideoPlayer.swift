@@ -544,7 +544,24 @@ class SharedVideoPlayer {
     /// Returns the duration of the video in seconds.
     func getDuration() -> Double {
         guard let item = player?.currentItem else { return 0 }
-        return CMTimeGetSeconds(item.asset.duration)
+
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+            // Use the modern API with async/await
+            Task {
+                do {
+                    let duration = try await item.asset.load(.duration)
+                    return CMTimeGetSeconds(duration)
+                } catch {
+                    print("Error loading duration: \(error.localizedDescription)")
+                    return 0
+                }
+            }
+            // Return the current value while the task is running
+            return CMTimeGetSeconds(item.asset.duration)
+        } else {
+            // Use deprecated property for older OS versions
+            return CMTimeGetSeconds(item.asset.duration)
+        }
     }
 
     /// Returns the current playback time in seconds.
