@@ -105,17 +105,39 @@ class SharedVideoPlayer {
                     "Erreur lors du chargement des pistes vidéo : \(error?.localizedDescription ?? "Inconnue")"
                 )
                 return
-
             }
 
-            videoFrameRate = Float(videoTrack.nominalFrameRate)
-            if videoFrameRate <= 0 {
-                // Fallback to common default if detection fails
-                videoFrameRate = 30.0
-            }
+            // Replace deprecated nominalFrameRate property
+            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+                Task {
+                    do {
+                        let frameRate = try await videoTrack.load(.nominalFrameRate)
+                        self.videoFrameRate = Float(frameRate)
+                        if self.videoFrameRate <= 0 {
+                            // Fallback to common default if detection fails
+                            self.videoFrameRate = 30.0
+                        }
 
-            // Set capture rate to the lower of the two rates
-            updateCaptureFrameRate()
+                        // Set capture rate to the lower of the two rates
+                        self.updateCaptureFrameRate()
+                    } catch {
+                        print("Error loading nominal frame rate: \(error.localizedDescription)")
+                        // Fallback to common default if detection fails
+                        self.videoFrameRate = 30.0
+                        self.updateCaptureFrameRate()
+                    }
+                }
+            } else {
+                // Use deprecated property for older OS versions
+                videoFrameRate = Float(videoTrack.nominalFrameRate)
+                if videoFrameRate <= 0 {
+                    // Fallback to common default if detection fails
+                    videoFrameRate = 30.0
+                }
+
+                // Set capture rate to the lower of the two rates
+                updateCaptureFrameRate()
+            }
         }
     }
 
