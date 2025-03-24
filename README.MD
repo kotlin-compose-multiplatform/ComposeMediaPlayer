@@ -35,6 +35,7 @@ Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/Compo
 | WMV | ✅ | ✅ | ❌ | ❌ | ❌ |
 | 3GP | ✅ | ✅ | ✅ | ✅ | ❌ |
 
+
 ## 🔧 Installation
 
 To add Compose Media Player to your project, include the following dependency in your `build.gradle.kts` file:
