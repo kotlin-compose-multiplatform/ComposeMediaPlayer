@@ -16,7 +16,7 @@ plugins {
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
-version = "0.3.1"
+version = "0.4.0"
 
 val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
 val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
@@ -60,6 +60,7 @@ kotlin {
             api(libs.filekit.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlin.logging)
+            implementation(libs.kermit)
         }
 
         commonTest.dependencies {

@@ -6,6 +6,8 @@
 - **MFPlayer** for Windows
 - **JavaFX** for macOS
 - **Media3** for Android
+- **AVPlayer** for iOS
+- **HTML5 Player** for WASMJS
 
 ## 🚀 Live Demo
 
@@ -21,17 +23,16 @@ Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/Compo
 - **Error handling** Simple error handling for network or playback issues.
 
 ## ✨ Supported Formats
-
-| Video Format | Windows | macOS | Linux | Android |
-|--------------|---------|-------|-------|---------|
-| MP4 (H.264)  | ✅       | ✅     | ✅     | ✅       |
-| AVI          | ✅       | ❌     | ✅     | ✅       |
-| MKV          | ?       | ?     | ?     | ?       |
-| MOV          | ✅       | ❌     | ✅     | ?       |
-| FLV          | ?       | ?     | ?     | ?       |
-| WEBM         | ?       | ?     | ?     | ?       |
-| WMV          | ✅       | ?     | ?     | ?       |
-| 3GP          | ?       | ?     | ?     | ?       |
+| Video Format | Windows | macOS | Linux | Android | iOS | WasmJS |
+|--------------|---------|-------|-------|---------|-----|--------|
+| MP4 (H.264)  | ✅       | ✅     | ✅     | ✅       | ✅   | ✅      |
+| AVI          | ✅       | ❌     | ✅     | ✅       | ❌   | ❌      |
+| MKV          | ?       | ?     | ?     | ?       | ❌   | ❌      |
+| MOV          | ✅       | ❌     | ✅     | ?       | ✅   | ✅      |
+| FLV          | ?       | ?     | ?     | ?       | ❌   | ❌      |
+| WEBM         | ?       | ?     | ?     | ?       | ❌   | ✅      |
+| WMV          | ✅       | ?     | ?     | ?       | ❌   | ❌      |
+| 3GP          | ?       | ?     | ?     | ?       | ?   | ❌      |
 
 
 ## 🔧 Installation
@@ -40,7 +41,7 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:0.3.0")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.4.0")
 }
 ```
 
@@ -189,6 +190,10 @@ To display audio levels:
 println("Left level: ${playerState.leftLevel.toInt()}%, Right level: ${playerState.rightLevel.toInt()}%")
 ```
 
+> [!IMPORTANT]
+> This feature is not working on iOS.
+
+
 ### Error Handling
 
 In case of an error, you can display it using `println`:
@@ -200,7 +205,7 @@ playerState.error?.let { error ->
 }
 ```
 
-### Loadind Indicator
+### Loading Indicator
 
 To detect if the video is buffering:
 
@@ -216,7 +221,7 @@ if (playerState.isLoading) {
 
 Compose Media Player supports adding subtitles from both URLs and local files. 
 > [!IMPORTANT]
-> This feature is actually not supported on Windows and Mac.
+> This feature is actually not supported on Windows, Mac and iOS.
 
 #### 🎯 Adding Subtitles from url or local file
 
