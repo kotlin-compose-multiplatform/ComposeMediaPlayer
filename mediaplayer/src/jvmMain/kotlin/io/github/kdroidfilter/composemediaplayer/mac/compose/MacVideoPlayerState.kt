@@ -16,6 +16,7 @@ import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.awt.image.BufferedImage
@@ -697,23 +698,18 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
 
             if (isPlaying) {
                 SharedVideoPlayer.INSTANCE.playVideo(ptr)
-
-                // Force a frame update after seek
-                delay(50)
+                // Reduce delay to update frame faster for local videos
+                delay(10)
                 updateFrameAsync()
-
-                // Timeout for the seek operation
+                // Reduced timeout delay from 2000ms to 300ms
                 ioScope.launch {
-                    delay(2000) // Reduced from 3000ms
+                    delay(300)
                     if (seekInProgress) {
                         macLogger.d { "seekToAsync() - Forcing end of seek after timeout" }
                         seekInProgress = false
                         targetSeekTime = null
-
-                        val currentTime = System.currentTimeMillis()
-                        val timeSinceLastFrame = currentTime - lastFrameUpdateTime
                         withContext(Dispatchers.Main) {
-                            isLoading = timeSinceLastFrame >= bufferingTimeoutThreshold
+                            isLoading = false
                         }
                     }
                 }
