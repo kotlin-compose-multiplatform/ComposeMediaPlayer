@@ -412,39 +412,41 @@ class SharedVideoPlayer {
     }
 
     /// Setup audio tap on the AVPlayerItem to process audio samples.
-    /// Call this function after creating your AVPlayerItem.
-    private func setupAudioTap(for playerItem: AVPlayerItem) {
-        guard let asset = playerItem.asset as? AVURLAsset else { return }
-        // Get the first audio track
-        guard let audioTrack = asset.tracks(withMediaType: .audio).first else { return }
+   private func setupAudioTap(for playerItem: AVPlayerItem) {
+       guard let asset = playerItem.asset as? AVURLAsset else { return }
 
-        // Create input parameters with a processing tap
-        let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
+       // Load audio tracks asynchronously
+       asset.loadTracks(withMediaType: .audio) { tracks, error in
+           guard let audioTrack = tracks?.first, error == nil else { return }
 
-        // Define tap callbacks in English
-        var callbacks = MTAudioProcessingTapCallbacks(
-            version: kMTAudioProcessingTapCallbacksVersion_0,
-            clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-            init: tapInit,
-            finalize: tapFinalize,
-            prepare: tapPrepare,
-            unprepare: tapUnprepare,
-            process: tapProcess
-        )
+           // Create input parameters with a processing tap
+           let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
 
-        var tap: Unmanaged<MTAudioProcessingTap>?
-        // Create the audio processing tap
-        let status = MTAudioProcessingTapCreate(
-            kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
-        if status == noErr, let tap = tap {
-            inputParams.audioTapProcessor = tap.takeRetainedValue()
-            let audioMix = AVMutableAudioMix()
-            audioMix.inputParameters = [inputParams]
-            playerItem.audioMix = audioMix
-        } else {
-            print("Audio Tap creation failed with status: \(status)")
-        }
-    }
+           // Rest of your existing tap setup code...
+           var callbacks = MTAudioProcessingTapCallbacks(
+               version: kMTAudioProcessingTapCallbacksVersion_0,
+               clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+               init: self.tapInit,
+               finalize: self.tapFinalize,
+               prepare: self.tapPrepare,
+               unprepare: self.tapUnprepare,
+               process: self.tapProcess
+           )
+
+           var tap: Unmanaged<MTAudioProcessingTap>?
+           // Create the audio processing tap
+           let status = MTAudioProcessingTapCreate(
+               kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
+           if status == noErr, let tap = tap {
+               inputParams.audioTapProcessor = tap.takeRetainedValue()
+               let audioMix = AVMutableAudioMix()
+               audioMix.inputParameters = [inputParams]
+               playerItem.audioMix = audioMix
+           } else {
+               print("Audio Tap creation failed with status: \(status)")
+           }
+       }
+   }
 
     /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
