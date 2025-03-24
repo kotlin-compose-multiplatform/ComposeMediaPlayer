@@ -16,7 +16,6 @@ import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.awt.image.BufferedImage
@@ -25,7 +24,7 @@ import kotlin.math.abs
 
 // Initialize logger using Kermit
 internal val macLogger = Logger.withTag("MacVideoPlayerState")
-//    .apply { setMinSeverity(Severity.Warn) }
+    .apply { setMinSeverity(Severity.Warn) }
 
 /**
  * MacVideoPlayerState handles the native Mac video player state.
@@ -132,14 +131,15 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
     private fun startUIUpdateJob() {
         uiUpdateJob?.cancel()
         uiUpdateJob = ioScope.launch {
-            _currentFrameState.debounce(16).collect { newFrame ->
-                    ensureActive() // Check if coroutine is still active
-                    withContext(Dispatchers.Main) {
-                        (currentFrameState as MutableState).value = newFrame
-                    }
+            _currentFrameState.debounce(1).collect { newFrame ->
+                ensureActive() // Checks that the coroutine is still active
+                withContext(Dispatchers.Main) {
+                    (currentFrameState as MutableState).value = newFrame
                 }
+            }
         }
     }
+
 
     /** Initializes the native video player on the IO thread. */
     private suspend fun initPlayer() = ioScope.launch {
