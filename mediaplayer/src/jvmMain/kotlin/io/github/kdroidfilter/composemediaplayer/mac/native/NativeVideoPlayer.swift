@@ -428,7 +428,7 @@ class SharedVideoPlayer {
      }
 
      // Log des informations sur le format audio pour le débogage
-     print("Audio buffer: numBuffers=\(bufferList.mNumberBuffers), size=\(bufferList.mBuffers.mDataByteSize), frames=\(localFrames)")
+     //print("Audio buffer: numBuffers=\(bufferList.mNumberBuffers), size=\(bufferList.mBuffers.mDataByteSize), frames=\(localFrames)")
 
      // Assuming interleaved float data (adjust if using a different format)
      let data = mBuffers.bindMemory(
@@ -457,7 +457,7 @@ class SharedVideoPlayer {
          let avgRight = rightCount > 0 ? rightSum / Float(rightCount) : 0.0
 
          // Update the properties
-         print("Audio levels: L=\(avgLeft), R=\(avgRight)")
+         //print("Audio levels: L=\(avgLeft), R=\(avgRight)")
          mySelf.leftAudioLevel = avgLeft
          mySelf.rightAudioLevel = avgRight
      } else {

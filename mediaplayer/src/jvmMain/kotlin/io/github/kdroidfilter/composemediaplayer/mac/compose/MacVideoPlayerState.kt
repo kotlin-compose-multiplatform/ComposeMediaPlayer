@@ -492,13 +492,21 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             if (ptr != null) {
                 val newLeft = SharedVideoPlayer.INSTANCE.getLeftAudioLevel(ptr)
                 val newRight = SharedVideoPlayer.INSTANCE.getRightAudioLevel(ptr)
+//                macLogger.d { "Audio levels fetched: L=$newLeft, R=$newRight" }
 
-                // Log the values for debugging
-                macLogger.d { "Audio levels fetched: L=$newLeft, R=$newRight" }
+                // Converts the linear level to a percentage on a logarithmic scale.
+                fun convertToPercentage(level: Float): Float {
+                    if (level <= 0f) return 0f
+                    // Conversion to decibels: 20 * log10(level)
+                    val db = 20 * kotlin.math.log10(level)
+                    // Assume that -60 dB corresponds to silence and 0 dB to maximum level.
+                    val normalized = ((db + 60) / 60).coerceIn(0f, 1f)
+                    return normalized * 100f
+                }
 
                 withContext(Dispatchers.Main) {
-                    _leftLevel.value = newLeft
-                    _rightLevel.value = newRight
+                    _leftLevel.value = convertToPercentage(newLeft)
+                    _rightLevel.value = convertToPercentage(newRight)
                 }
             }
         } catch (e: Exception) {
