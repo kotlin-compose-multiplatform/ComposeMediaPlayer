@@ -26,7 +26,8 @@ import java.awt.image.DataBufferInt
 import kotlin.math.abs
 
 // Initialize logger using Kermit
-internal val macLogger = Logger.withTag("MacVideoPlayerState").apply { setMinSeverity(Severity.Warn) }
+internal val macLogger = Logger.withTag("MacVideoPlayerState")
+    .apply { setMinSeverity(Severity.Warn) }
 
 /**
  * MacVideoPlayerState handles the native Mac video player state.
@@ -355,6 +356,8 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 updateFrameAsync()
                 if (!userDragging) {
                     updatePositionAsync()
+                    // Call the audio level update separately
+                    updateAudioLevelsAsync()
                 }
                 delay(updateInterval)
             }
@@ -484,6 +487,29 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         }
     }
 
+    private suspend fun updateAudioLevelsAsync() {
+        if (!hasMedia) return
+
+        try {
+            val ptr = mainMutex.withLock { playerPtr }
+            if (ptr != null) {
+                val newLeft = SharedVideoPlayer.INSTANCE.getLeftAudioLevel(ptr)
+                val newRight = SharedVideoPlayer.INSTANCE.getRightAudioLevel(ptr)
+
+                // Log the values for debugging
+                macLogger.d { "Audio levels fetched: L=$newLeft, R=$newRight" }
+
+                withContext(Dispatchers.Main) {
+                    _leftLevel.value = newLeft
+                    _rightLevel.value = newRight
+                }
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            macLogger.e { "Error updating audio levels: ${e.message}" }
+        }
+    }
+
     /**
      * Updates the playback position, slider, and audio levels on a background
      * thread.
@@ -501,22 +527,6 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             withContext(Dispatchers.Main) {
                 _positionText.value = formatTime(current)
                 _durationText.value = formatTime(duration)
-            }
-
-            // Update left and right audio levels from the native player
-            val ptr = mainMutex.withLock { playerPtr }
-            if (ptr != null) {
-                try {
-                    val newLeft = SharedVideoPlayer.INSTANCE.getLeftAudioLevel(ptr)
-                    val newRight = SharedVideoPlayer.INSTANCE.getRightAudioLevel(ptr)
-                    withContext(Dispatchers.Main) {
-                        _leftLevel.value = newLeft
-                        _rightLevel.value = newRight
-                    }
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    macLogger.e { "Error retrieving audio levels: ${e.message}" }
-                }
             }
 
             // Handle seek in progress

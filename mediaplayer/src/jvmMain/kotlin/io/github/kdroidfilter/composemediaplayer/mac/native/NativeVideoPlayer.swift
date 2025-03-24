@@ -394,66 +394,98 @@ class SharedVideoPlayer {
     }
 
     /// Callback: Process audio. This is where you calculate the audio levels.
-    private let tapProcess: MTAudioProcessingTapProcessCallback = {
-        (tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut) in
-        // Get the tap context (the SharedVideoPlayer instance)
-        let opaqueSelf = MTAudioProcessingTapGetStorage(tap)
-        let mySelf = Unmanaged<SharedVideoPlayer>.fromOpaque(opaqueSelf).takeUnretainedValue()
+ private let tapProcess: MTAudioProcessingTapProcessCallback = {
+     (tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut) in
 
-        var localFrames = numberFrames
-        // Retrieve the audio buffers
-        let status = MTAudioProcessingTapGetSourceAudio(
-            tap, localFrames, bufferListInOut, flagsOut, nil, nil)
-        if status != noErr {
+     // Get the tap context (the SharedVideoPlayer instance)
+     let opaqueSelf = MTAudioProcessingTapGetStorage(tap)
+     let mySelf = Unmanaged<SharedVideoPlayer>.fromOpaque(opaqueSelf).takeUnretainedValue()
+
+     var localFrames = numberFrames
+
+     // Retrieve the audio buffers
+     let status = MTAudioProcessingTapGetSourceAudio(
+         tap, localFrames, bufferListInOut, flagsOut, nil, nil)
+     if status != noErr {
+         print("MTAudioProcessingTapGetSourceAudio failed with status: \(status)")
+         return
+     }
+
+     // Process the audio buffers to calculate left and right channel levels.
+     let bufferList = bufferListInOut.pointee
+
+     // Vérifier que les buffers sont valides
+     guard bufferList.mNumberBuffers > 0 else {
+         print("No audio buffers available")
+         return
+     }
+
+     // Vérifier le format audio (nous attendons du Float32)
+     guard let mBuffers = bufferList.mBuffers.mData,
+           bufferList.mBuffers.mDataByteSize > 0 else {
+         print("Invalid audio buffer data")
+         return
+     }
+
+     // Log des informations sur le format audio pour le débogage
+     print("Audio buffer: numBuffers=\(bufferList.mNumberBuffers), size=\(bufferList.mBuffers.mDataByteSize), frames=\(localFrames)")
+
+     // Assuming interleaved float data (adjust if using a different format)
+     let data = mBuffers.bindMemory(
+         to: Float.self, capacity: Int(bufferList.mBuffers.mDataByteSize / 4))
+     let frameCount = Int(localFrames)
+     var leftSum: Float = 0.0
+     var rightSum: Float = 0.0
+     var leftCount = 0
+     var rightCount = 0
+
+     // Assuming stereo (2 channels)
+     if frameCount > 0 {
+         for frame in 0..<frameCount {
+             if frame * 2 + 1 < Int(bufferList.mBuffers.mDataByteSize / 4) {
+                 let leftSample = data[frame * 2]
+                 let rightSample = data[frame * 2 + 1]
+                 leftSum += abs(leftSample)
+                 rightSum += abs(rightSample)
+                 leftCount += 1
+                 rightCount += 1
+             }
+         }
+
+         // Calculate average level for each channel
+         let avgLeft = leftCount > 0 ? leftSum / Float(leftCount) : 0.0
+         let avgRight = rightCount > 0 ? rightSum / Float(rightCount) : 0.0
+
+         // Update the properties
+         print("Audio levels: L=\(avgLeft), R=\(avgRight)")
+         mySelf.leftAudioLevel = avgLeft
+         mySelf.rightAudioLevel = avgRight
+     } else {
+         print("No audio frames to process")
+     }
+
+     numberFramesOut.pointee = localFrames
+ }
+
+    // Dans la méthode setupAudioTap, ajoutez une vérification du format audio et un log
+    private func setupAudioTap(for playerItem: AVPlayerItem) {
+        guard let asset = playerItem.asset as? AVURLAsset else {
+            print("Asset is not an AVURLAsset")
             return
         }
 
-        // Process the audio buffers to calculate left and right channel levels.
-        let bufferList = bufferListInOut.pointee
-        // Assuming interleaved float data (adjust if using a different format)
-        if let mBuffers = bufferList.mBuffers.mData {
-            let data = mBuffers.bindMemory(
-                to: Float.self, capacity: Int(bufferList.mBuffers.mDataByteSize / 4))
-            let frameCount = Int(localFrames)
-            var leftSum: Float = 0.0
-            var rightSum: Float = 0.0
-            var leftCount = 0
-            var rightCount = 0
-
-            // Assuming stereo (2 channels)
-            for frame in 0..<frameCount {
-                let leftSample = data[frame * 2]
-                let rightSample = data[frame * 2 + 1]
-                leftSum += abs(leftSample)
-                rightSum += abs(rightSample)
-                leftCount += 1
-                rightCount += 1
-            }
-
-            // Calculate average level for each channel
-            let avgLeft = leftCount > 0 ? leftSum / Float(leftCount) : 0.0
-            let avgRight = rightCount > 0 ? rightSum / Float(rightCount) : 0.0
-
-            // Update the properties (if needed, you might want to convert to dB)
-            mySelf.leftAudioLevel = avgLeft
-            mySelf.rightAudioLevel = avgRight
-        }
-
-        numberFramesOut.pointee = localFrames
-    }
-
-    /// Setup audio tap on the AVPlayerItem to process audio samples.
-    private func setupAudioTap(for playerItem: AVPlayerItem) {
-        guard let asset = playerItem.asset as? AVURLAsset else { return }
-
         // Load audio tracks asynchronously
         asset.loadTracks(withMediaType: .audio) { tracks, error in
-            guard let audioTrack = tracks?.first, error == nil else { return }
+            guard let audioTrack = tracks?.first, error == nil else {
+                print("No audio track found or error: \(error?.localizedDescription ?? "unknown")")
+                return
+            }
+
+            print("Audio track found, setting up tap")
 
             // Create input parameters with a processing tap
             let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
 
-            // Rest of your existing tap setup code...
             var callbacks = MTAudioProcessingTapCallbacks(
                 version: kMTAudioProcessingTapCallbacksVersion_0,
                 clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
@@ -470,6 +502,7 @@ class SharedVideoPlayer {
                 kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap
             )
             if status == noErr, let tap = tap {
+                print("Audio tap created successfully")
                 inputParams.audioTapProcessor = tap.takeRetainedValue()
                 let audioMix = AVMutableAudioMix()
                 audioMix.inputParameters = [inputParams]
