@@ -154,7 +154,6 @@ class SharedVideoPlayer {
 
     /// Opens the video from the given URI (local or network)
     func openUri(_ uri: String) {
-
         isReadyForPlayback = false
         pendingPlay = false
 
@@ -181,54 +180,86 @@ class SharedVideoPlayer {
                 return
             }
 
-            let naturalSize = videoTrack.naturalSize
-            let transform = videoTrack.preferredTransform
-            let effectiveSize = naturalSize.applying(transform)
-            frameWidth = Int(abs(effectiveSize.width))
-            frameHeight = Int(abs(effectiveSize.height))
+            if #available(macOS 13.0, iOS 16.0, tvOS 16.0, *) {
+                Task {
+                    do {
+                        // Use the modern API to load naturalSize and preferredTransform
+                        let naturalSize = try await videoTrack.load(.naturalSize)
+                        let transform = try await videoTrack.load(.preferredTransform)
 
-            // Allocate or reuse the shared buffer if capacity matches
-            let totalPixels = frameWidth * frameHeight
-            if let buffer = frameBuffer, bufferCapacity == totalPixels {
-                buffer.initialize(repeating: 0, count: totalPixels)
-            } else {
-                frameBuffer?.deallocate()
-                frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
-                frameBuffer?.initialize(repeating: 0, count: totalPixels)
-                bufferCapacity = totalPixels
-            }
+                        let effectiveSize = naturalSize.applying(transform)
+                        frameWidth = Int(abs(effectiveSize.width))
+                        frameHeight = Int(abs(effectiveSize.height))
 
-            // Create attributes for the CVPixelBuffer (BGRA format) with IOSurface for better performance
-            let pixelBufferAttributes: [String: Any] = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                kCVPixelBufferWidthKey as String: frameWidth,
-                kCVPixelBufferHeightKey as String: frameHeight,
-                kCVPixelBufferIOSurfacePropertiesKey as String: [:],
-            ]
-            videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
-
-            let item = AVPlayerItem(asset: asset)
-            if let output = videoOutput {
-                item.add(output)
-            }
-            player = AVPlayer(playerItem: item)
-
-            setupAudioTap(for: item)
-
-            // Set initial volume
-            player?.volume = volume
-
-            // Capture initial frame
-            captureInitialFrame()
-
-            // Marquer comme prêt à la lecture
-            self.isReadyForPlayback = true
-
-            // Si une lecture était en attente, démarrer la lecture
-            if self.pendingPlay {
-                DispatchQueue.main.async {
-                    self.play()
+                        // Continue with buffer allocation and setup
+                        setupFrameBuffer()
+                        setupVideoOutputAndPlayer(with: asset)
+                    } catch {
+                        print("Error loading video track properties: \(error.localizedDescription)")
+                    }
                 }
+            } else {
+                // Fallback for older OS versions using deprecated properties
+                let naturalSize = videoTrack.naturalSize
+                let transform = videoTrack.preferredTransform
+
+                let effectiveSize = naturalSize.applying(transform)
+                frameWidth = Int(abs(effectiveSize.width))
+                frameHeight = Int(abs(effectiveSize.height))
+
+                // Continue with buffer allocation and setup
+                setupFrameBuffer()
+                setupVideoOutputAndPlayer(with: asset)
+            }
+        }
+    }
+
+    // Helper method to setup frame buffer
+    private func setupFrameBuffer() {
+        // Allocate or reuse the shared buffer if capacity matches
+        let totalPixels = frameWidth * frameHeight
+        if let buffer = frameBuffer, bufferCapacity == totalPixels {
+            buffer.initialize(repeating: 0, count: totalPixels)
+        } else {
+            frameBuffer?.deallocate()
+            frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
+            frameBuffer?.initialize(repeating: 0, count: totalPixels)
+            bufferCapacity = totalPixels
+        }
+    }
+
+    // Helper method to setup video output and player
+    private func setupVideoOutputAndPlayer(with asset: AVAsset) {
+        // Create attributes for the CVPixelBuffer (BGRA format) with IOSurface for better performance
+        let pixelBufferAttributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: frameWidth,
+            kCVPixelBufferHeightKey as String: frameHeight,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+        ]
+        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
+
+        let item = AVPlayerItem(asset: asset)
+        if let output = videoOutput {
+            item.add(output)
+        }
+        player = AVPlayer(playerItem: item)
+
+        setupAudioTap(for: item)
+
+        // Set initial volume
+        player?.volume = volume
+
+        // Capture initial frame
+        captureInitialFrame()
+
+        // Mark as ready for playback
+        self.isReadyForPlayback = true
+
+        // If playback was pending, start playback
+        if self.pendingPlay {
+            DispatchQueue.main.async {
+                self.play()
             }
         }
     }
@@ -412,41 +443,42 @@ class SharedVideoPlayer {
     }
 
     /// Setup audio tap on the AVPlayerItem to process audio samples.
-   private func setupAudioTap(for playerItem: AVPlayerItem) {
-       guard let asset = playerItem.asset as? AVURLAsset else { return }
+    private func setupAudioTap(for playerItem: AVPlayerItem) {
+        guard let asset = playerItem.asset as? AVURLAsset else { return }
 
-       // Load audio tracks asynchronously
-       asset.loadTracks(withMediaType: .audio) { tracks, error in
-           guard let audioTrack = tracks?.first, error == nil else { return }
+        // Load audio tracks asynchronously
+        asset.loadTracks(withMediaType: .audio) { tracks, error in
+            guard let audioTrack = tracks?.first, error == nil else { return }
 
-           // Create input parameters with a processing tap
-           let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
+            // Create input parameters with a processing tap
+            let inputParams = AVMutableAudioMixInputParameters(track: audioTrack)
 
-           // Rest of your existing tap setup code...
-           var callbacks = MTAudioProcessingTapCallbacks(
-               version: kMTAudioProcessingTapCallbacksVersion_0,
-               clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-               init: self.tapInit,
-               finalize: self.tapFinalize,
-               prepare: self.tapPrepare,
-               unprepare: self.tapUnprepare,
-               process: self.tapProcess
-           )
+            // Rest of your existing tap setup code...
+            var callbacks = MTAudioProcessingTapCallbacks(
+                version: kMTAudioProcessingTapCallbacksVersion_0,
+                clientInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+                init: self.tapInit,
+                finalize: self.tapFinalize,
+                prepare: self.tapPrepare,
+                unprepare: self.tapUnprepare,
+                process: self.tapProcess
+            )
 
-           var tap: Unmanaged<MTAudioProcessingTap>?
-           // Create the audio processing tap
-           let status = MTAudioProcessingTapCreate(
-               kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
-           if status == noErr, let tap = tap {
-               inputParams.audioTapProcessor = tap.takeRetainedValue()
-               let audioMix = AVMutableAudioMix()
-               audioMix.inputParameters = [inputParams]
-               playerItem.audioMix = audioMix
-           } else {
-               print("Audio Tap creation failed with status: \(status)")
-           }
-       }
-   }
+            var tap: Unmanaged<MTAudioProcessingTap>?
+            // Create the audio processing tap
+            let status = MTAudioProcessingTapCreate(
+                kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap
+            )
+            if status == noErr, let tap = tap {
+                inputParams.audioTapProcessor = tap.takeRetainedValue()
+                let audioMix = AVMutableAudioMix()
+                audioMix.inputParameters = [inputParams]
+                playerItem.audioMix = audioMix
+            } else {
+                print("Audio Tap creation failed with status: \(status)")
+            }
+        }
+    }
 
     /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
