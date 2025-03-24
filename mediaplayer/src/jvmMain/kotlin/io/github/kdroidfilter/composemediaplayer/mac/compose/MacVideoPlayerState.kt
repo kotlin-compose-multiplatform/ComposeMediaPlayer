@@ -1,9 +1,6 @@
 package io.github.kdroidfilter.composemediaplayer.mac.compose
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import co.touchlab.kermit.Logger
@@ -27,7 +24,7 @@ import kotlin.math.abs
 
 // Initialize logger using Kermit
 internal val macLogger = Logger.withTag("MacVideoPlayerState")
-//    .apply { setMinSeverity(Severity.Warn) }
+    .apply { setMinSeverity(Severity.Warn) }
 
 /**
  * MacVideoPlayerState handles the native Mac video player state.
@@ -137,7 +134,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
                 .collect { newFrame ->
                     ensureActive() // Check if coroutine is still active
                     withContext(Dispatchers.Main) {
-                        (currentFrameState as androidx.compose.runtime.MutableState).value = newFrame
+                        (currentFrameState as MutableState).value = newFrame
                     }
                 }
         }
