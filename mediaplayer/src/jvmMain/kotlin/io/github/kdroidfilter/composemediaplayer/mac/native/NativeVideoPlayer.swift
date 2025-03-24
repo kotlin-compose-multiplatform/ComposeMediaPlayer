@@ -41,6 +41,8 @@ class SharedVideoPlayer {
 
     // Flag to track if playback is active
     private var isPlaying: Bool = false
+    private var isReadyForPlayback = false
+    private var pendingPlay = false
 
     ///Two properties to store the left and right audio levels.
     private var leftAudioLevel: Float = 0.0
@@ -152,6 +154,10 @@ class SharedVideoPlayer {
 
     /// Opens the video from the given URI (local or network)
     func openUri(_ uri: String) {
+
+        isReadyForPlayback = false
+        pendingPlay = false
+
         // Determine the URL (local or network)
         let url: URL = {
             if let parsedURL = URL(string: uri), parsedURL.scheme != nil {
@@ -167,50 +173,64 @@ class SharedVideoPlayer {
         detectVideoFrameRate(from: asset)
 
         // Retrieve the video track to obtain the actual dimensions
-        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-            print("Video track not found")
-            return
+        asset.loadTracks(withMediaType: .video) { [self] tracks, error in
+            guard let videoTrack = tracks?.first, error == nil else {
+                print(
+                    "Erreur lors du chargement des pistes vidéo : \(error?.localizedDescription ?? "Inconnue")"
+                )
+                return
+            }
+
+            let naturalSize = videoTrack.naturalSize
+            let transform = videoTrack.preferredTransform
+            let effectiveSize = naturalSize.applying(transform)
+            frameWidth = Int(abs(effectiveSize.width))
+            frameHeight = Int(abs(effectiveSize.height))
+
+            // Allocate or reuse the shared buffer if capacity matches
+            let totalPixels = frameWidth * frameHeight
+            if let buffer = frameBuffer, bufferCapacity == totalPixels {
+                buffer.initialize(repeating: 0, count: totalPixels)
+            } else {
+                frameBuffer?.deallocate()
+                frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
+                frameBuffer?.initialize(repeating: 0, count: totalPixels)
+                bufferCapacity = totalPixels
+            }
+
+            // Create attributes for the CVPixelBuffer (BGRA format) with IOSurface for better performance
+            let pixelBufferAttributes: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: frameWidth,
+                kCVPixelBufferHeightKey as String: frameHeight,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            ]
+            videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
+
+            let item = AVPlayerItem(asset: asset)
+            if let output = videoOutput {
+                item.add(output)
+            }
+            player = AVPlayer(playerItem: item)
+
+            setupAudioTap(for: item)
+
+            // Set initial volume
+            player?.volume = volume
+
+            // Capture initial frame
+            captureInitialFrame()
+
+            // Marquer comme prêt à la lecture
+            self.isReadyForPlayback = true
+
+            // Si une lecture était en attente, démarrer la lecture
+            if self.pendingPlay {
+                DispatchQueue.main.async {
+                    self.play()
+                }
+            }
         }
-
-        let naturalSize = videoTrack.naturalSize
-        let transform = videoTrack.preferredTransform
-        let effectiveSize = naturalSize.applying(transform)
-        frameWidth = Int(abs(effectiveSize.width))
-        frameHeight = Int(abs(effectiveSize.height))
-
-        // Allocate or reuse the shared buffer if capacity matches
-        let totalPixels = frameWidth * frameHeight
-        if let buffer = frameBuffer, bufferCapacity == totalPixels {
-            buffer.initialize(repeating: 0, count: totalPixels)
-        } else {
-            frameBuffer?.deallocate()
-            frameBuffer = UnsafeMutablePointer<UInt32>.allocate(capacity: totalPixels)
-            frameBuffer?.initialize(repeating: 0, count: totalPixels)
-            bufferCapacity = totalPixels
-        }
-
-        // Create attributes for the CVPixelBuffer (BGRA format) with IOSurface for better performance
-        let pixelBufferAttributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey as String: frameWidth,
-            kCVPixelBufferHeightKey as String: frameHeight,
-            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
-        ]
-        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
-
-        let item = AVPlayerItem(asset: asset)
-        if let output = videoOutput {
-            item.add(output)
-        }
-        player = AVPlayer(playerItem: item)
-
-        setupAudioTap(for: item)
-
-        // Set initial volume
-        player?.volume = volume
-
-        // Capture initial frame
-        captureInitialFrame()
     }
 
     /// Captures initial frame to display without starting the display link
@@ -428,9 +448,14 @@ class SharedVideoPlayer {
 
     /// Starts video playback and begins frame capture at the optimized frame rate.
     func play() {
-        isPlaying = true
-        player?.play()
-        configureDisplayLink()
+        if isReadyForPlayback {
+            isPlaying = true
+            player?.play()
+            configureDisplayLink()
+        } else {
+            // Marquer qu'une lecture est en attente
+            pendingPlay = true
+        }
     }
 
     /// Pauses video playback and stops frame capture.
