@@ -652,6 +652,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
             withContext(Dispatchers.Main) {
                 hasMedia = false
                 isLoading = false
+                resetState()
             }
         }
     }
@@ -859,6 +860,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         stopBufferingCheck()
         ioScope.launch {
             _currentFrameState.value = null
+
         }
     }
 
