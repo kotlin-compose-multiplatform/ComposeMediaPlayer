@@ -27,7 +27,7 @@ import kotlin.math.abs
 
 // Initialize logger using Kermit
 internal val macLogger = Logger.withTag("MacVideoPlayerState")
-    .apply { setMinSeverity(Severity.Warn) }
+//    .apply { setMinSeverity(Severity.Warn) }
 
 /**
  * MacVideoPlayerState handles the native Mac video player state.
@@ -133,7 +133,7 @@ class MacVideoPlayerState : PlatformVideoPlayerState {
         uiUpdateJob?.cancel()
         uiUpdateJob = ioScope.launch {
             _currentFrameState
-                .debounce(33) // Reduced from 16ms to 33ms (max 30fps) to reduce UI load
+                .debounce(16)
                 .collect { newFrame ->
                     ensureActive() // Check if coroutine is still active
                     withContext(Dispatchers.Main) {
