@@ -1,10 +1,8 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import com.vanniktech.maven.publish.SonatypeHost
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import java.util.*
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -16,21 +14,8 @@ plugins {
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
-version = "0.4.0"
+version = "0.5.0"
 
-val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
-
-val fxClassifier = when {
-    osName.contains("linux") && osArch.contains("aarch64") -> "linux-aarch64"
-    osName.contains("linux") -> "linux"
-    osName.contains("windows") -> "win"
-    osName.contains("mac") && osArch.contains("aarch64") -> "mac-aarch64"
-    osName.contains("mac") -> "mac"
-    else -> throw IllegalStateException("Unsupported OS: $osName")
-}
-
-val javafxVersion = "22.0.1"
 
 tasks.withType<DokkaTask>().configureEach {
     moduleName.set("Compose Media Player")
@@ -40,7 +25,6 @@ tasks.withType<DokkaTask>().configureEach {
 
 kotlin {
     jvmToolchain(17)
-
     androidTarget { publishLibraryVariants("release") }
     jvm()
     wasmJs {
@@ -50,6 +34,7 @@ kotlin {
     iosX64()
     iosArm64()
     iosSimulatorArm64()
+    macosArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -83,11 +68,6 @@ kotlin {
             implementation(libs.jna)
             implementation(libs.jna.platform)
             implementation(libs.slf4j.simple)
-
-            compileOnly("org.openjfx:javafx-base:${javafxVersion}:${fxClassifier}")
-            compileOnly("org.openjfx:javafx-graphics:${javafxVersion}:${fxClassifier}")
-            compileOnly("org.openjfx:javafx-swing:${javafxVersion}:${fxClassifier}")
-            compileOnly("org.openjfx:javafx-media:${javafxVersion}:${fxClassifier}")
         }
 
         iosMain.dependencies {

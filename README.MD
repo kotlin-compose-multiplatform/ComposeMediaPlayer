@@ -1,12 +1,14 @@
 # 🎥 Compose Media Player
 
+<img src="/assets/banner.jpg" style="border-radius: 10px;"/>
+
 **Compose Media Player** is a video player library designed for Compose Multiplatform, supporting multiple platforms including Android, macOS, Windows, and Linux. It is the first fully functional multiplatform video player for Compose for Desktop that requires no additional software installations. The library leverages:
 
 - **GStreamer** for Linux
 - **MFPlayer** for Windows
+- **AVPlayer** for macOS and iOS
 - **JavaFX** for macOS
 - **Media3** for Android
-- **AVPlayer** for iOS
 - **HTML5 Player** for WASMJS
 
 ## 🚀 Live Demo
@@ -22,17 +24,18 @@ Try the online demo here : [🎥 Live Demo](https://kdroidfilter.github.io/Compo
 - **Audio Levels**: Displays left and right audio levels in real time.
 - **Error handling** Simple error handling for network or playback issues.
 
-## ✨ Supported Formats
-| Video Format | Windows | macOS | Linux | Android | iOS | WasmJS |
-|--------------|---------|-------|-------|---------|-----|--------|
-| MP4 (H.264)  | ✅       | ✅     | ✅     | ✅       | ✅   | ✅      |
-| AVI          | ✅       | ❌     | ✅     | ✅       | ❌   | ❌      |
-| MKV          | ?       | ?     | ?     | ?       | ❌   | ❌      |
-| MOV          | ✅       | ❌     | ✅     | ?       | ✅   | ✅      |
-| FLV          | ?       | ?     | ?     | ?       | ❌   | ❌      |
-| WEBM         | ?       | ?     | ?     | ?       | ❌   | ✅      |
-| WMV          | ✅       | ?     | ?     | ?       | ❌   | ❌      |
-| 3GP          | ?       | ?     | ?     | ?       | ?   | ❌      |
+## ✨ Supported Video Formats
+| Format | Windows | Linux  | macOS & iOS                                                       | Android | WasmJS |
+|--------|-----------------|-------------------|-----------------------------------------------------------------------------|-----------------|-------------------|
+| **Player** | [MFPlay](https://learn.microsoft.com/en-us/windows/win32/medfound/using-mfplay-for-audio-video-playback) | [GStreamer](https://gstreamer.freedesktop.org/) | [AVPlayer](https://developer.apple.com/documentation/avfoundation/avplayer) | [Media 3](https://developer.android.com/media/media3) | [HTML5 Video](https://www.w3schools.com/html/html5_video.asp) |
+| MP4 (H.264) | ✅ | ✅ | ✅                                                                           | ✅ | ✅ |
+| AVI | ✅ | ✅ | ❌                                                                           | ❌ | ❌ |
+| MKV | ❌ | ✅ | ❌                                                                           | ✅ | ❌ |
+| MOV | ✅ | ✅ | ✅                                                                           | ❌ | ✅ |
+| FLV | ❌ | ✅ | ❌                                                                           | ❌ | ❌ |
+| WEBM | ❌ | ✅ | ❌                                                                           | ✅ | ✅ |
+| WMV | ✅ | ✅ | ❌                                                                           | ❌ | ❌ |
+| 3GP | ✅ | ✅ | ✅                                                                           | ✅ | ❌ |
 
 
 ## 🔧 Installation
@@ -41,40 +44,9 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:0.4.0")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.5.0")
 }
 ```
-
-> [!IMPORTANT]
-> Currently, you also need to manually include JavaFX dependencies if your application is also intended for macOS.
-
-```kotlin
-val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-val osArch = System.getProperty("os.arch").lowercase(Locale.getDefault())
-
-val javafxVersion = "22.0.1"
-
-jvmMain.dependencies {
-    implementation(compose.desktop.currentOs)
-    if (osName.contains("mac")) {
-        val macClassifier = if (osArch.contains("aarch64")) "mac-aarch64" else "mac"
-        implementation("org.openjfx:javafx-base:${javafxVersion}:${macClassifier}")
-        implementation("org.openjfx:javafx-graphics:${javafxVersion}:${macClassifier}")
-        implementation("org.openjfx:javafx-swing:${javafxVersion}:${macClassifier}")
-        implementation("org.openjfx:javafx-media:${javafxVersion}:${macClassifier}")
-    }
-}
-```
-
-> [!WARNING]
-> JavaFX Warning on macOS: A warning message may appear during runtime:
-
-  ```
-  Jan 20, 2025 7:24:02 AM com.sun.javafx.application.PlatformImpl startup
-  WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @367d4c06'
-  ```
-
-This warning does not appear to cause any functional issues but is under investigation.
 
 ## 🚀 Getting Started
 
@@ -309,7 +281,6 @@ Compose Media Player is licensed under the MIT License. See [LICENSE](LICENSE) f
 ## 📊 Roadmap
 
 - **Buffering Detection**: Implement functionality to detect and handle buffering events during playback via an `isLoading` state.
-- **iOS and WebAssembly (WasmJS) Support**: Expand support to additional platforms to enhance compatibility.
 - **Audio Player**: Introduce a standalone audio player for handling audio-only content.
 - **Player with Separate Audio and Video Streams**: Add functionality to support different audio and video streams for advanced playback scenarios.
 - **Metadata Support**: Add support for extracting the following metadata:
