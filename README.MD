@@ -7,7 +7,6 @@
 - **GStreamer** for Linux
 - **MFPlayer** for Windows
 - **AVPlayer** for macOS and iOS
-- **JavaFX** for macOS
 - **Media3** for Android
 - **HTML5 Player** for WASMJS
 
