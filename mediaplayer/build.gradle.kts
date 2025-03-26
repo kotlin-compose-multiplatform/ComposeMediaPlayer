@@ -14,11 +14,8 @@ plugins {
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
-version = "0.4.0"
+version = "0.5.0"
 
-
-
-val javafxVersion = "22.0.1"
 
 tasks.withType<DokkaTask>().configureEach {
     moduleName.set("Compose Media Player")
@@ -28,7 +25,6 @@ tasks.withType<DokkaTask>().configureEach {
 
 kotlin {
     jvmToolchain(17)
-
     androidTarget { publishLibraryVariants("release") }
     jvm()
     wasmJs {
