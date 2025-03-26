@@ -1,5 +1,7 @@
 # 🎥 Compose Media Player
 
+<img src="/assets/banner.jpg"/>
+
 **Compose Media Player** is a video player library designed for Compose Multiplatform, supporting multiple platforms including Android, macOS, Windows, and Linux. It is the first fully functional multiplatform video player for Compose for Desktop that requires no additional software installations. The library leverages:
 
 - **GStreamer** for Linux
