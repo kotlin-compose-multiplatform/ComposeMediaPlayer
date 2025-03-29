@@ -4,6 +4,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asComposeImageBitmap
 import io.github.kdroidfilter.composemediaplayer.PlatformVideoPlayerState
 import io.github.kdroidfilter.composemediaplayer.SubtitleTrack
 import io.github.kdroidfilter.composemediaplayer.VideoMetadata
@@ -11,19 +13,30 @@ import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import org.freedesktop.gstreamer.Bus
+import org.freedesktop.gstreamer.Buffer
+import org.freedesktop.gstreamer.Caps
 import org.freedesktop.gstreamer.Element
 import org.freedesktop.gstreamer.ElementFactory
 import org.freedesktop.gstreamer.Format
 import org.freedesktop.gstreamer.Gst
 import org.freedesktop.gstreamer.GstObject
+import org.freedesktop.gstreamer.FlowReturn
+import org.freedesktop.gstreamer.Sample
 import org.freedesktop.gstreamer.State.PAUSED
 import org.freedesktop.gstreamer.State.PLAYING
 import org.freedesktop.gstreamer.State.READY
+import org.freedesktop.gstreamer.Structure
 import org.freedesktop.gstreamer.TagList
+import org.freedesktop.gstreamer.elements.AppSink
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
-import org.freedesktop.gstreamer.swing.GstVideoComponent
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.ImageInfo
+import java.nio.ByteBuffer
 import java.awt.EventQueue
+import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
 import java.util.*
@@ -56,8 +69,16 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     }
 
     private val playbin = PlayBin("playbin")
-    val gstVideoComponent = GstVideoComponent()
+    private val videoSink = ElementFactory.make("appsink", "videosink") as AppSink
     private val sliderTimer = Timer(50, null)
+
+    // Video frame properties
+    private var _currentFrame by mutableStateOf<ImageBitmap?>(null)
+    val currentFrame: ImageBitmap?
+        get() = _currentFrame
+
+    private var frameWidth = 0
+    private var frameHeight = 0
 
     // region: State Declarations
     private var bufferingPercent by mutableStateOf(100)
@@ -244,7 +265,25 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         // GStreamer Configuration
         val levelElement = ElementFactory.make("level", "level")
         playbin.set("audio-filter", levelElement)
-        playbin.setVideoSink(gstVideoComponent.element)
+
+        // Configure AppSink for video
+        // We request RGBA format and use the raw data directly without any color conversion
+        // This approach preserves the original color representation from GStreamer
+        val caps = Caps.fromString("video/x-raw,format=RGBA")
+        videoSink.setCaps(caps)
+        videoSink.set("emit-signals", true)
+        videoSink.connect(object : AppSink.NEW_SAMPLE {
+            override fun newSample(appSink: AppSink): FlowReturn {
+                val sample = appSink.pullSample()
+                if (sample != null) {
+                    processSample(sample)
+                    sample.dispose()
+                }
+                return FlowReturn.OK
+            }
+        })
+
+        playbin.setVideoSink(videoSink)
 
         // Bus Event Management
         playbin.bus.connect(object : Bus.EOS {
@@ -516,11 +555,114 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         _error = null
     }
 
+    /**
+     * Processes a video sample from GStreamer and converts it to an ImageBitmap
+     * that can be drawn in a Compose Canvas.
+     * 
+     * This implementation extracts the actual video frame data from the GStreamer Sample
+     * and converts it to a Compose ImageBitmap without applying any color conversion.
+     * The raw data from GStreamer is passed directly to the Skia Bitmap to preserve
+     * the original color representation.
+     */
+    private fun processSample(sample: Sample) {
+        try {
+            val caps = sample.caps
+            val structure = caps.getStructure(0)
+
+            val width = structure.getInteger("width")
+            val height = structure.getInteger("height")
+
+            if (width != frameWidth || height != frameHeight) {
+                frameWidth = width
+                frameHeight = height
+                updateAspectRatio()
+                println("Video dimensions: $width x $height")
+            }
+
+            // Get the buffer from the sample
+            val buffer = sample.buffer
+            if (buffer == null) {
+                println("Error: Buffer is null")
+                return
+            }
+
+            // Create a BufferedImage to hold the pixel data
+            val bufferedImage = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+            val pixels = IntArray(width * height)
+
+            // Try to get information about the buffer
+            println("Attempting to access buffer data")
+
+            // Try to access the buffer data
+            try {
+                // Get the raw data from the buffer
+                val data = buffer.map(false)
+                if (data != null) {
+                    println("Successfully mapped buffer data")
+
+                    // Copy the data to the pixel array
+                    val byteBuffer = data
+                    byteBuffer.rewind()
+
+                    // Copy raw data without any color conversion
+                    for (i in 0 until width * height) {
+                        // Read 4 bytes (RGBA or BGRA) and store them directly
+                        val byte1 = byteBuffer.get().toInt() and 0xFF
+                        val byte2 = byteBuffer.get().toInt() and 0xFF
+                        val byte3 = byteBuffer.get().toInt() and 0xFF
+                        val byte4 = byteBuffer.get().toInt() and 0xFF
+                        // Store in the same order as received
+                        pixels[i] = (byte4 shl 24) or (byte3 shl 16) or (byte2 shl 8) or byte1
+                    }
+
+                    // Set the pixels in the BufferedImage
+                    bufferedImage.setRGB(0, 0, width, height, pixels, 0, width)
+
+                    // Convert the BufferedImage to a Skia Bitmap
+                    val imageInfo = ImageInfo.makeN32(width, height, ColorAlphaType.PREMUL)
+                    val bitmap = Bitmap()
+                    bitmap.allocPixels(imageInfo)
+
+                    // Copy the pixel data from the BufferedImage to the Skia Bitmap
+                    bufferedImage.getRGB(0, 0, width, height, pixels, 0, width)
+
+                    // Set the pixels in the Skia Bitmap
+                    val pixmap = bitmap.peekPixels()
+                    if (pixmap != null) {
+                        for (y in 0 until height) {
+                            for (x in 0 until width) {
+                                // Use the pixel value directly without any color conversion
+                                val pixel = pixels[y * width + x]
+                                pixmap.erase(pixel, org.jetbrains.skia.IRect.makeXYWH(x, y, 1, 1))
+                            }
+                        }
+                    }
+
+                    // Convert the Skia Bitmap to a Compose ImageBitmap
+                    val imageBitmap = bitmap.asComposeImageBitmap()
+
+                    // Update the current frame on the UI thread
+                    EventQueue.invokeLater {
+                        _currentFrame = imageBitmap
+                    }
+                } else {
+                    println("Failed to map buffer data")
+                }
+            } catch (e: Exception) {
+                println("Error accessing buffer data: ${e.message}")
+                e.printStackTrace()
+            }
+        } catch (e: Exception) {
+            println("Error processing video sample: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
     override fun dispose() {
         sliderTimer.stop()
         playbin.stop()
         playbin.dispose()
-        gstVideoComponent.element.dispose()
+        videoSink.dispose()
         Gst.deinit()
     }
 }
