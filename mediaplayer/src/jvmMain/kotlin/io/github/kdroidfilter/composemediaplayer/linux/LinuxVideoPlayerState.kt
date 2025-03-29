@@ -612,7 +612,10 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                         val byte3 = byteBuffer.get().toInt() and 0xFF
                         val byte4 = byteBuffer.get().toInt() and 0xFF
                         // Store in the same order as received
-                        pixels[i] = (byte4 shl 24) or (byte3 shl 16) or (byte2 shl 8) or byte1
+                        pixels[i] = (byte4 shl 24) or  // alpha
+                                (byte1 shl 16) or  // rouge
+                                (byte2 shl 8)  or  // vert
+                                (byte3)            // bleu
                     }
 
                     // Set the pixels in the BufferedImage
