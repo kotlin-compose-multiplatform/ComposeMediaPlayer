@@ -1,6 +1,6 @@
 # 🎥 Compose Media Player
 
-<img src="/assets/banner.jpg" style="border-radius: 10px;"/>
+<img src="/assets/banner.png" style="border-radius: 10px;"/>
 
 **Compose Media Player** is a video player library designed for Compose Multiplatform, supporting multiple platforms including Android, macOS, Windows, and Linux. It is the first fully functional multiplatform video player for Compose for Desktop that requires no additional software installations. The library leverages:
 
@@ -43,7 +43,7 @@ To add Compose Media Player to your project, include the following dependency in
 
 ```kotlin
 dependencies {
-    implementation("io.github.kdroidfilter:composemediaplayer:0.5.1")
+    implementation("io.github.kdroidfilter:composemediaplayer:0.5.2")
 }
 ```
 
