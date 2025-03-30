@@ -12,49 +12,30 @@ import io.github.kdroidfilter.composemediaplayer.VideoMetadata
 import io.github.kdroidfilter.composemediaplayer.VideoPlayerError
 import io.github.kdroidfilter.composemediaplayer.util.DEFAULT_ASPECT_RATIO
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
-import org.freedesktop.gstreamer.Bus
-import org.freedesktop.gstreamer.Buffer
-import org.freedesktop.gstreamer.Caps
-import org.freedesktop.gstreamer.Element
-import org.freedesktop.gstreamer.ElementFactory
-import org.freedesktop.gstreamer.Format
-import org.freedesktop.gstreamer.Gst
-import org.freedesktop.gstreamer.GstObject
-import org.freedesktop.gstreamer.FlowReturn
-import org.freedesktop.gstreamer.Sample
-import org.freedesktop.gstreamer.State.PAUSED
-import org.freedesktop.gstreamer.State.PLAYING
-import org.freedesktop.gstreamer.State.READY
-import org.freedesktop.gstreamer.Structure
-import org.freedesktop.gstreamer.TagList
+import org.freedesktop.gstreamer.*
 import org.freedesktop.gstreamer.elements.AppSink
 import org.freedesktop.gstreamer.elements.PlayBin
 import org.freedesktop.gstreamer.event.SeekFlags
+import org.freedesktop.gstreamer.message.MessageType
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
-import java.nio.ByteBuffer
 import java.awt.EventQueue
-import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
-import java.util.*
+import java.util.EnumSet
 import javax.swing.Timer
+import kotlin.math.abs
 import kotlin.math.pow
 
 /**
- * LinuxVideoPlayerState serves as a Linux-specific implementation of a
- * video player state, utilizing GStreamer.
+ * LinuxVideoPlayerState serves as the Linux-specific implementation for
+ * a video player using GStreamer.
  *
- * In this version, to dynamically change the subtitle source, the pipeline
- * is reset to READY and then PLAYING, and a Timer triggers a seek with
- * a slight delay to resume playback exactly at the saved position.
- *
- * For local subtitles, the path is converted into a file URI.
- *
- * Note: This approach may cause a slight glitch when changing subtitles.
- *
+ * To dynamically change the subtitle source, the pipeline is set to READY,
+ * the source is updated, and then the pipeline is set back to PLAYING.
+ * A Timer performs a slight seek to reposition exactly at the saved position.
  */
 @Stable
 class LinuxVideoPlayerState : PlatformVideoPlayerState {
@@ -72,7 +53,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private val videoSink = ElementFactory.make("appsink", "videosink") as AppSink
     private val sliderTimer = Timer(50, null)
 
-    // Video frame properties
+    // ---- Internal states ----
     private var _currentFrame by mutableStateOf<ImageBitmap?>(null)
     val currentFrame: ImageBitmap?
         get() = _currentFrame
@@ -80,7 +61,6 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private var frameWidth = 0
     private var frameHeight = 0
 
-    // region: State Declarations
     private var bufferingPercent by mutableStateOf(100)
     private var isUserPaused by mutableStateOf(false)
 
@@ -91,6 +71,8 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             _sliderPos = value
         }
 
+    // This variable will allow us to handle a potential delay before buffering is signaled
+    private var _isSeeking by mutableStateOf(false)
     private var targetSeekPos: Float = 0f
 
     private var _userDragging by mutableStateOf(false)
@@ -154,107 +136,14 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
     private var _error by mutableStateOf<VideoPlayerError?>(null)
     override val error: VideoPlayerError?
         get() = _error
+
     override val metadata: VideoMetadata = VideoMetadata()
+
     override var subtitlesEnabled: Boolean = false
     override var currentSubtitleTrack: SubtitleTrack? = null
     override val availableSubtitleTracks = mutableListOf<SubtitleTrack>()
-    // endregion
 
-    /**
-     * Selects the subtitle track to use.
-     *
-     * To change subtitles on the fly, if the video is playing, we save the
-     * current position, force the pipeline to READY state, update the source
-     * and the flag, then switch back to PLAYING. A Timer then triggers a seek
-     * to the saved position.
-     *
-     * For local subtitles, the path is converted to a file URI.
-     */
-    override fun selectSubtitleTrack(track: SubtitleTrack?) {
-        currentSubtitleTrack = track
-        try {
-            if (track != null) {
-                val suburi = if (track.src.toString().startsWith("http://") ||
-                    track.src.toString().startsWith("https://")
-                ) {
-                    track.src.toString()
-                } else {
-                    File(track.src.toString()).toURI().toString()
-                }
-                if (isPlaying) {
-                    val pos = playbin.queryPosition(Format.TIME)
-                    // Force a complete pipeline reconfiguration
-                    playbin.state = READY
-                    playbin.set("suburi", suburi)
-                    val currentFlags = playbin.get("flags") as Int
-                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
-                    playbin.state = PLAYING
-                    // Use a Timer to delay the seek and resume at the correct position
-                    Timer(100) { _ ->
-                        playbin.seekSimple(
-                            Format.TIME,
-                            EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
-                            pos
-                        )
-                    }.apply {
-                        isRepeats = false
-                        start()
-                    }
-                } else {
-                    playbin.set("suburi", suburi)
-                    val currentFlags = playbin.get("flags") as Int
-                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
-                }
-                subtitlesEnabled = true
-            } else {
-                disableSubtitles()
-            }
-        } catch (e: Exception) {
-            _error = VideoPlayerError.UnknownError("Error selecting subtitles: ${e.message}")
-        }
-    }
-
-    /**
-     * Selects the subtitle track to use.
-     *
-     * To dynamically change subtitles, if the video is playing, we save the
-     * current position, force the pipeline to READY state, update the source
-     * and flag, and then resume PLAYING. A Timer then triggers a seek to
-     * resume playback at the saved position.
-     *
-     * For local subtitles, the path is converted into a file URI.
-     */
-    override fun disableSubtitles() {
-        currentSubtitleTrack = null
-        try {
-            if (isPlaying) {
-                val pos = playbin.queryPosition(Format.TIME)
-                playbin.state = READY
-                playbin.set("suburi", "")
-                val currentFlags = playbin.get("flags") as Int
-                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
-                playbin.state = PLAYING
-                Timer(100) { _ ->
-                    playbin.seekSimple(
-                        Format.TIME,
-                        EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
-                        pos
-                    )
-                }.apply {
-                    isRepeats = false
-                    start()
-                }
-            } else {
-                playbin.set("suburi", "")
-                val currentFlags = playbin.get("flags") as Int
-                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
-            }
-            subtitlesEnabled = false
-        } catch (e: Exception) {
-            _error = VideoPlayerError.UnknownError("Error disabling subtitles : ${e.message}")
-        }
-    }
-
+    // ---- Aspect ratio management ----
     private var lastAspectRatioUpdateTime: Long = 0
     private val ASPECT_RATIO_DEBOUNCE_MS = 500
     private var _aspectRatio by mutableStateOf(DEFAULT_ASPECT_RATIO)
@@ -262,15 +151,14 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         get() = _aspectRatio
 
     init {
-        // GStreamer Configuration
+        // GStreamer configuration
         val levelElement = ElementFactory.make("level", "level")
         playbin.set("audio-filter", levelElement)
 
-        // Configure AppSink for video
-        // We request RGBA format and use the raw data directly without any color conversion
-        // This approach preserves the original color representation from GStreamer
+        // Configuration of the AppSink for video
+        // Requesting RGBA (R, G, B, A) without additional conversion.
         val caps = Caps.fromString("video/x-raw,format=RGBA")
-        videoSink.setCaps(caps)
+        videoSink.caps = caps
         videoSink.set("emit-signals", true)
         videoSink.connect(object : AppSink.NEW_SAMPLE {
             override fun newSample(appSink: AppSink): FlowReturn {
@@ -282,36 +170,43 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 return FlowReturn.OK
             }
         })
-
         playbin.setVideoSink(videoSink)
 
-        // Bus Event Management
+        // ---- GStreamer bus handling ----
+
+        // End of stream
         playbin.bus.connect(object : Bus.EOS {
             override fun endOfStream(source: GstObject) {
                 EventQueue.invokeLater {
                     if (loop) {
+                        // Restart from beginning if loop = true
                         playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH), 0)
                     } else {
                         stop()
                     }
-                    _isPlaying = loop // Updates state based on loop mode
+                    _isPlaying = loop
                 }
             }
         })
 
+        // Errors
         playbin.bus.connect(object : Bus.ERROR {
             override fun errorMessage(source: GstObject, code: Int, message: String) {
                 EventQueue.invokeLater {
                     _error = when {
-                        message.contains("codec") || message.contains("decode") ->
+                        message.contains("codec", ignoreCase = true) ||
+                                message.contains("decode", ignoreCase = true) ->
                             VideoPlayerError.CodecError(message)
 
-                        message.contains("network") || message.contains("connection") ||
-                                message.contains("DNS") || message.contains("http") ->
+                        message.contains("network", ignoreCase = true) ||
+                                message.contains("connection", ignoreCase = true) ||
+                                message.contains("dns", ignoreCase = true) ||
+                                message.contains("http", ignoreCase = true) ->
                             VideoPlayerError.NetworkError(message)
 
-                        message.contains("source") || message.contains("uri") ||
-                                message.contains("resource") ->
+                        message.contains("source", ignoreCase = true) ||
+                                message.contains("uri", ignoreCase = true) ||
+                                message.contains("resource", ignoreCase = true) ->
                             VideoPlayerError.SourceError(message)
 
                         else ->
@@ -322,41 +217,44 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         })
 
+        // Buffering
         playbin.bus.connect(object : Bus.BUFFERING {
             override fun bufferingData(source: GstObject, percent: Int) {
                 EventQueue.invokeLater {
                     bufferingPercent = percent
+                    // When reaching 100%, we consider that any seek has finished
+                    if (percent == 100) {
+                        _isSeeking = false
+                    }
                     updateLoadingState()
                 }
             }
         })
 
+        // Pipeline state change
         playbin.bus.connect(object : Bus.STATE_CHANGED {
             override fun stateChanged(
                 source: GstObject,
-                old: org.freedesktop.gstreamer.State,
-                current: org.freedesktop.gstreamer.State,
-                pending: org.freedesktop.gstreamer.State,
+                old: State,
+                current: State,
+                pending: State,
             ) {
                 EventQueue.invokeLater {
                     when (current) {
-                        PLAYING -> {
+                        State.PLAYING -> {
                             _isPlaying = true
                             isUserPaused = false
                             updateLoadingState()
                             updateAspectRatio()
                         }
-
-                        PAUSED -> {
+                        State.PAUSED -> {
                             _isPlaying = false
                             updateLoadingState()
                         }
-
-                        READY -> {
+                        State.READY -> {
                             _isPlaying = false
                             updateLoadingState()
                         }
-
                         else -> {
                             _isPlaying = false
                             updateLoadingState()
@@ -366,16 +264,14 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         })
 
-        // TAG management for metadata
+        // TAG (metadata, if needed)
         playbin.bus.connect(object : Bus.TAG {
             override fun tagsFound(source: GstObject?, tagList: TagList?) {
-                EventQueue.invokeLater {
-                    // TODO: Implémenter l'extraction des métadonnées
-                }
+                // Metadata implementation if necessary
             }
         })
 
-        // Monitoring audio levels
+        // Measuring audio level (via the "level" element)
         playbin.bus.connect("element") { _, message ->
             if (message.source == levelElement) {
                 val struct = message.structure
@@ -401,7 +297,17 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
         }
 
-        // Position/duration update timer
+        // Also monitoring the end of async transitions (e.g., after a seek)
+        playbin.bus.connect("async-done") { _, message ->
+            if (message.type == MessageType.ASYNC_DONE) {
+                EventQueue.invokeLater {
+                    _isSeeking = false
+                    updateLoadingState()
+                }
+            }
+        }
+
+        // Timer for the slider position and duration
         sliderTimer.addActionListener {
             if (!userDragging) {
                 val dur = playbin.queryDuration(Format.TIME)
@@ -411,7 +317,7 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                     val currentSliderPos = (relPos * 1000.0).toFloat()
 
                     if (targetSeekPos > 0f) {
-                        if (kotlin.math.abs(targetSeekPos - currentSliderPos) < 1f) {
+                        if (abs(targetSeekPos - currentSliderPos) < 1f) {
                             _sliderPos = currentSliderPos
                             targetSeekPos = 0f
                         }
@@ -431,16 +337,93 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         sliderTimer.start()
     }
 
+    // ---- Subtitle management ----
+    override fun selectSubtitleTrack(track: SubtitleTrack?) {
+        currentSubtitleTrack = track
+        try {
+            if (track != null) {
+                val subUri = if (
+                    track.src.toString().startsWith("http://") ||
+                    track.src.toString().startsWith("https://")
+                ) {
+                    track.src.toString()
+                } else {
+                    File(track.src.toString()).toURI().toString()
+                }
+                if (isPlaying) {
+                    val pos = playbin.queryPosition(Format.TIME)
+                    playbin.state = State.READY
+                    playbin.set("suburi", subUri)
+                    val currentFlags = playbin.get("flags") as Int
+                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
+                    playbin.state = State.PLAYING
+                    // Timer to perform a seek to the correct position
+                    Timer(100) { _ ->
+                        playbin.seekSimple(
+                            Format.TIME,
+                            EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
+                            pos
+                        )
+                    }.apply {
+                        isRepeats = false
+                        start()
+                    }
+                } else {
+                    playbin.set("suburi", subUri)
+                    val currentFlags = playbin.get("flags") as Int
+                    playbin.set("flags", currentFlags or GST_PLAY_FLAG_TEXT)
+                }
+                subtitlesEnabled = true
+            } else {
+                disableSubtitles()
+            }
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Error while selecting subtitles: ${e.message}")
+        }
+    }
+
+    override fun disableSubtitles() {
+        currentSubtitleTrack = null
+        try {
+            if (isPlaying) {
+                val pos = playbin.queryPosition(Format.TIME)
+                playbin.state = State.READY
+                playbin.set("suburi", "")
+                val currentFlags = playbin.get("flags") as Int
+                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
+                playbin.state = State.PLAYING
+                Timer(100) { _ ->
+                    playbin.seekSimple(
+                        Format.TIME,
+                        EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE),
+                        pos
+                    )
+                }.apply {
+                    isRepeats = false
+                    start()
+                }
+            } else {
+                playbin.set("suburi", "")
+                val currentFlags = playbin.get("flags") as Int
+                playbin.set("flags", currentFlags and GST_PLAY_FLAG_TEXT.inv())
+            }
+            subtitlesEnabled = false
+        } catch (e: Exception) {
+            _error = VideoPlayerError.UnknownError("Error disabling subtitles: ${e.message}")
+        }
+    }
+
+    // ---- Aspect ratio management ----
     private fun updateAspectRatio() {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastAspectRatioUpdateTime < ASPECT_RATIO_DEBOUNCE_MS) {
-            return // Update ignored if too recent
+            return
         }
         lastAspectRatioUpdateTime = currentTime
 
         try {
-            val videoSink = playbin.get("video-sink") as? Element
-            val sinkPad = videoSink?.getStaticPad("sink")
+            val videoSinkElement = playbin.get("video-sink") as? Element
+            val sinkPad = videoSinkElement?.getStaticPad("sink")
             val caps = sinkPad?.currentCaps
             val structure = caps?.getStructure(0)
 
@@ -450,16 +433,14 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
                 if (width > 0 && height > 0) {
                     val calculatedRatio = width.toFloat() / height.toFloat()
-                    if (calculatedRatio != _aspectRatio) { // Mise à jour uniquement si la valeur change
+                    if (calculatedRatio != _aspectRatio) {
                         EventQueue.invokeLater {
                             _aspectRatio = if (calculatedRatio > 0) calculatedRatio else 16f / 9f
-                            println("Aspect ratio updated to: $_aspectRatio")
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            println("Error updating aspect ratio: ${e.message}")
             e.printStackTrace()
             _aspectRatio = 16f / 9f
         }
@@ -467,18 +448,19 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
 
     private fun updateLoadingState() {
         _isLoading = when {
-            bufferingPercent < 100 -> true  // Still buffering
-            isUserPaused -> false           // User paused, not loading
-            else -> false                   // No buffering or pausing
+            bufferingPercent < 100 -> true
+            _isSeeking -> true
+            isUserPaused -> false
+            else -> false
         }
     }
 
+    // ---- Controls ----
     override fun openUri(uri: String) {
-        stop() // Stop playback and set _isPlaying back to false
+        stop()
         clearError()
         _isLoading = true
         _hasMedia = false
-
         try {
             val uriObj = if (uri.startsWith("http://") || uri.startsWith("https://")) {
                 URI(uri)
@@ -487,9 +469,9 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
             }
             playbin.setURI(uriObj)
             _hasMedia = true
-            play() // Starts playback, which sets _isPlaying to true if successful
+            play()
         } catch (e: Exception) {
-            _error = VideoPlayerError.SourceError("Failed to open URI: ${e.message}")
+            _error = VideoPlayerError.SourceError("Unable to open URI: ${e.message}")
             _isLoading = false
             _isPlaying = false
             _hasMedia = false
@@ -531,16 +513,21 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         isUserPaused = false
         bufferingPercent = 100
         _hasMedia = false
+        _isSeeking = false
     }
 
     override fun seekTo(value: Float) {
         val dur = playbin.queryDuration(Format.TIME)
         if (dur > 0) {
+            // Force the loading and seeking indicator before the operation
+            _isSeeking = true
+            _isLoading = true
+
             _sliderPos = value
             targetSeekPos = value
 
             val relPos = value / 1000f
-            val seekPos = (relPos * dur.toDouble()).toLong()
+            val seekPos = (relPos * dur).toLong()
             _positionText = formatTime(seekPos, true)
 
             playbin.seekSimple(Format.TIME, EnumSet.of(SeekFlags.FLUSH, SeekFlags.ACCURATE), seekPos)
@@ -555,19 +542,15 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
         _error = null
     }
 
+    // ---- Processing of a video sample ----
     /**
-     * Processes a video sample from GStreamer and converts it to an ImageBitmap
-     * that can be drawn in a Compose Canvas.
-     * 
-     * This implementation extracts the actual video frame data from the GStreamer Sample
-     * and converts it to a Compose ImageBitmap without applying any color conversion.
-     * The raw data from GStreamer is passed directly to the Skia Bitmap to preserve
-     * the original color representation.
+     * Directly reads in RGBA and copies to a Skia Bitmap in the RGBA_8888 format
+     * (non-premultiplied). This avoids redundant conversions to maintain accurate colors and performance.
      */
     private fun processSample(sample: Sample) {
         try {
-            val caps = sample.caps
-            val structure = caps.getStructure(0)
+            val caps = sample.caps ?: return
+            val structure = caps.getStructure(0) ?: return
 
             val width = structure.getInteger("width")
             val height = structure.getInteger("height")
@@ -576,91 +559,58 @@ class LinuxVideoPlayerState : PlatformVideoPlayerState {
                 frameWidth = width
                 frameHeight = height
                 updateAspectRatio()
-                println("Video dimensions: $width x $height")
             }
 
-            // Get the buffer from the sample
-            val buffer = sample.buffer
-            if (buffer == null) {
-                println("Error: Buffer is null")
-                return
+            val buffer = sample.buffer ?: return
+            val byteBuffer = buffer.map(false) ?: return
+            byteBuffer.rewind()
+
+            // Prepare a Skia Bitmap
+            val imageInfo = ImageInfo(
+                width,
+                height,
+                ColorType.RGBA_8888,
+                ColorAlphaType.UNPREMUL
+            )
+
+            val bitmap = Bitmap()
+            bitmap.allocPixels(imageInfo)
+
+            // Direct copy of RGBA data into a byte array
+            val totalPixels = width * height
+            val byteArray = ByteArray(totalPixels * 4)
+            var index = 0
+            repeat(totalPixels) {
+                // GStreamer provides RGBA in the order R, G, B, A
+                val r = byteBuffer.get().toInt() and 0xFF
+                val g = byteBuffer.get().toInt() and 0xFF
+                val b = byteBuffer.get().toInt() and 0xFF
+                val a = byteBuffer.get().toInt() and 0xFF
+                byteArray[index++] = r.toByte()
+                byteArray[index++] = g.toByte()
+                byteArray[index++] = b.toByte()
+                byteArray[index++] = a.toByte()
             }
 
-            // Create a BufferedImage to hold the pixel data
-            val bufferedImage = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
-            val pixels = IntArray(width * height)
+            // Install these pixels into the Bitmap
+            bitmap.installPixels(imageInfo, byteArray, width * 4)
 
-            // Try to get information about the buffer
-            println("Attempting to access buffer data")
+            // Convert the Skia Bitmap into a Compose ImageBitmap
+            val imageBitmap = bitmap.asComposeImageBitmap()
 
-            // Try to access the buffer data
-            try {
-                // Get the raw data from the buffer
-                val data = buffer.map(false)
-                if (data != null) {
-                    println("Successfully mapped buffer data")
-
-                    // Copy the data to the pixel array
-                    val byteBuffer = data
-                    byteBuffer.rewind()
-
-                    // Copy raw data without any color conversion
-                    for (i in 0 until width * height) {
-                        // Read 4 bytes (RGBA or BGRA) and store them directly
-                        val byte1 = byteBuffer.get().toInt() and 0xFF
-                        val byte2 = byteBuffer.get().toInt() and 0xFF
-                        val byte3 = byteBuffer.get().toInt() and 0xFF
-                        val byte4 = byteBuffer.get().toInt() and 0xFF
-                        // Store in the same order as received
-                        pixels[i] = (byte4 shl 24) or  // alpha
-                                (byte1 shl 16) or  // rouge
-                                (byte2 shl 8)  or  // vert
-                                (byte3)            // bleu
-                    }
-
-                    // Set the pixels in the BufferedImage
-                    bufferedImage.setRGB(0, 0, width, height, pixels, 0, width)
-
-                    // Convert the BufferedImage to a Skia Bitmap
-                    val imageInfo = ImageInfo.makeN32(width, height, ColorAlphaType.PREMUL)
-                    val bitmap = Bitmap()
-                    bitmap.allocPixels(imageInfo)
-
-                    // Copy the pixel data from the BufferedImage to the Skia Bitmap
-                    bufferedImage.getRGB(0, 0, width, height, pixels, 0, width)
-
-                    // Set the pixels in the Skia Bitmap
-                    val pixmap = bitmap.peekPixels()
-                    if (pixmap != null) {
-                        for (y in 0 until height) {
-                            for (x in 0 until width) {
-                                // Use the pixel value directly without any color conversion
-                                val pixel = pixels[y * width + x]
-                                pixmap.erase(pixel, org.jetbrains.skia.IRect.makeXYWH(x, y, 1, 1))
-                            }
-                        }
-                    }
-
-                    // Convert the Skia Bitmap to a Compose ImageBitmap
-                    val imageBitmap = bitmap.asComposeImageBitmap()
-
-                    // Update the current frame on the UI thread
-                    EventQueue.invokeLater {
-                        _currentFrame = imageBitmap
-                    }
-                } else {
-                    println("Failed to map buffer data")
-                }
-            } catch (e: Exception) {
-                println("Error accessing buffer data: ${e.message}")
-                e.printStackTrace()
+            // Update on the AWT thread
+            EventQueue.invokeLater {
+                _currentFrame = imageBitmap
             }
+
+            buffer.unmap()
+
         } catch (e: Exception) {
-            println("Error processing video sample: ${e.message}")
             e.printStackTrace()
         }
     }
 
+    // ---- Release resources ----
     override fun dispose() {
         sliderTimer.stop()
         playbin.stop()
