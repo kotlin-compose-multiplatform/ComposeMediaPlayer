@@ -57,11 +57,6 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                         avPlayerViewController.view.translatesAutoresizingMaskIntoConstraints = false
                         addSubview(avPlayerViewController.view)
 
-                        UIApplication.sharedApplication.keyWindow?.rootViewController?.let { rootVC ->
-                            rootVC.addChildViewController(avPlayerViewController)
-                            avPlayerViewController.didMoveToParentViewController(rootVC)
-                        }
-
                         NSLayoutConstraint.activateConstraints(
                             listOf(
                                 avPlayerViewController.view.topAnchor.constraintEqualToAnchor(this.topAnchor),
