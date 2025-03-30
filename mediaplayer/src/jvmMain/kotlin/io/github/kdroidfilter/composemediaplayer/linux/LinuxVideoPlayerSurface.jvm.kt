@@ -1,5 +1,6 @@
 package io.github.kdroidfilter.composemediaplayer.linux
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -7,16 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntSize
 
 /**
- * A composable function that renders a video player surface using GStreamer.
+ * A composable function that renders a video player surface using GStreamer with offscreen rendering.
  *
- * This function creates a video rendering area by embedding a Swing-based GStreamer video component
- * within a Jetpack Compose UI. The rendering is controlled through the provided `VideoPlayerState`.
+ * This function creates a video rendering area using a Compose Canvas to draw video frames
+ * that are rendered offscreen by GStreamer. This approach avoids the rendering issues
+ * that can occur when using SwingPanel, especially with overlapping UI elements.
  *
- * @param state The state object (`VideoPlayerState`) that encapsulates the GStreamer player logic,
- *              including playback control, timeline management, and video interaction.
+ * @param playerState The state object that encapsulates the GStreamer player logic,
+ *                    including playback control, timeline management, and video frames.
  * @param modifier An optional `Modifier` for customizing the layout and appearance of the
  *                 composable container. Defaults to an empty `Modifier`.
  */
@@ -31,12 +36,19 @@ fun LinuxVideoPlayerSurface(
         contentAlignment = Alignment.Center
     ) {
         if (playerState.hasMedia) {
-            SwingPanel(
+            Canvas(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .aspectRatio(playerState.aspectRatio),
-                factory = { playerState.gstVideoComponent }
-            )
+                    .aspectRatio(playerState.aspectRatio)
+            ) {
+                // Draw the current frame if available
+                playerState.currentFrame?.let { frame ->
+                    drawImage(
+                        image = frame,
+                        dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                    )
+                }
+            }
         }
     }
 }
