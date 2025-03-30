@@ -145,6 +145,9 @@ actual open class VideoPlayerState {
         removeEndObserver()
         player?.pause()
 
+        // Set loading state to true at the beginning of loading a new video
+        _isLoading = true
+
         val playerItem = AVPlayerItem(nsUrl)
         playerItem.presentationSize.useContents {
             _videoAspectRatio = if (height != 0.0) width / height else 16.0 / 9.0
@@ -212,8 +215,22 @@ actual open class VideoPlayerState {
 
     actual fun seekTo(value: Float) {
         if (_duration > 0) {
+            // Set loading state to true to indicate seeking is happening
+            _isLoading = true
+
             val targetTime = _duration * (value / 1000.0)
+
+            // First, perform a seek with a lower timescale (like in macOS)
             player?.seekToTime(CMTimeMakeWithSeconds(targetTime, 1))
+
+            // Then immediately perform another seek with a higher timescale
+            // This ensures at least one of the seeks will work properly
+            player?.seekToTime(CMTimeMakeWithSeconds(targetTime, 600))
+
+            // Reset loading state after a short delay
+            dispatch_async(dispatch_get_main_queue()) {
+                _isLoading = false
+            }
         }
     }
 

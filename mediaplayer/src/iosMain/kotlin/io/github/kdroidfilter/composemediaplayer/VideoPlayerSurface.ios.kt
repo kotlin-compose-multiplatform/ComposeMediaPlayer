@@ -81,10 +81,11 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                     containerView.layoutIfNeeded()
                     avPlayerViewController.view.setFrame(containerView.bounds)
 
-                    // Start playback if media is loaded and not already playing
-                    if (playerState.player != null && playerState.hasMedia) {
+                    // Only start playback if media is loaded, not already playing, and user hasn't paused
+                    if (playerState.player != null && playerState.hasMedia && !playerState.isPlaying) {
                         Logger.d { "Starting playback" }
-                        playerState.play()
+                        // Don't automatically play - let the user control playback
+                        // playerState.play()
                     }
                 }
             )
