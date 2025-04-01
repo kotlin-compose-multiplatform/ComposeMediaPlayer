@@ -96,11 +96,11 @@ actual open class VideoPlayerState {
                 _currentTime = currentSeconds
                 _duration = durationSeconds
 
-                if (!userDragging && durationSeconds > 0) {
+                if (!userDragging && durationSeconds > 0 && !currentSeconds.isNaN() && !durationSeconds.isNaN()) {
                     sliderPos = ((currentSeconds / durationSeconds) * 1000).toFloat()
                 }
-                _positionText = formatTime(currentSeconds.toFloat())
-                _durationText = formatTime(durationSeconds.toFloat())
+                _positionText = if (currentSeconds.isNaN()) "00:00" else formatTime(currentSeconds.toFloat())
+                _durationText = if (durationSeconds.isNaN()) "00:00" else formatTime(durationSeconds.toFloat())
 
                 player?.currentItem?.presentationSize?.useContents {
                     val newAspect = if (height != 0.0) width / height else 16.0 / 9.0
