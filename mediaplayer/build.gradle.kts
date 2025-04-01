@@ -14,7 +14,7 @@ plugins {
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
-version = "0.5.2"
+version = "0.5.3"
 
 
 tasks.withType<DokkaTask>().configureEach {
