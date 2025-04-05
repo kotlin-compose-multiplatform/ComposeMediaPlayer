@@ -12,9 +12,11 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import com.kdroid.androidcontextprovider.ContextProvider
+import io.github.kdroidfilter.composemediaplayer.util.buildCachingDataSourceFactory
 import io.github.kdroidfilter.composemediaplayer.util.formatTime
 import io.github.kdroidfilter.composemediaplayer.util.logger
 import io.github.vinceglb.filekit.AndroidFile
@@ -191,8 +193,9 @@ actual open class VideoPlayerState {
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink = audioSink
         }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-
+        val cacheDataSourceFactory = buildCachingDataSourceFactory(context)
         exoPlayer = ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .setRenderersFactory(renderersFactory)
             .build()
             .apply {
@@ -292,6 +295,7 @@ actual open class VideoPlayerState {
             mediaItemBuilder.setSubtitleConfigurations(listOf(subtitleConfig))
         }
         val mediaItem = mediaItemBuilder.build()
+
         openFromMediaItem(mediaItem)
     }
 

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
@@ -31,6 +32,8 @@ actual fun VideoPlayerSurface(playerState: VideoPlayerState, modifier: Modifier)
                     setStyle(CaptionStyleCompat.DEFAULT)
                     setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, 18f) //todo let user change subtitle size
                 }
+
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
 
                 // Hide the view when no media is loaded
                 visibility = if (playerState.hasMedia) View.VISIBLE else View.GONE

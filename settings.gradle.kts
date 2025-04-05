@@ -30,5 +30,4 @@ dependencyResolutionManagement {
     }
 }
 include(":mediaplayer")
-include(":sample:composeApp")
 

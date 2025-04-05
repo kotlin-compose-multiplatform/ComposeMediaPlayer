@@ -8,27 +8,18 @@ plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.jetbrainsCompose)
-    alias(libs.plugins.dokka)
 }
 
 group = "io.github.kdroidfilter.composemediaplayer"
 version = "0.5.3"
 
 
-tasks.withType<DokkaTask>().configureEach {
-    moduleName.set("Compose Media Player")
-    offlineMode.set(true)
-}
 
 
 kotlin {
     jvmToolchain(17)
     androidTarget { publishLibraryVariants("release") }
     jvm()
-    wasmJs {
-        browser()
-        binaries.executable()
-    }
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -54,8 +45,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.ui)
-
-
+            implementation(libs.androidx.media3.datasource)
         }
 
         jvmMain.dependencies {
@@ -70,9 +60,6 @@ kotlin {
         iosMain.dependencies {
         }
 
-        wasmJsMain.dependencies {
-            implementation(libs.kotlinx.browser.wasm.js)
-        }
 
     }
 
