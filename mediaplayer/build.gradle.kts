@@ -19,7 +19,6 @@ version = "0.5.3"
 kotlin {
     jvmToolchain(17)
     androidTarget { publishLibraryVariants("release") }
-    jvm()
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -48,14 +47,6 @@ kotlin {
             implementation(libs.androidx.media3.datasource)
         }
 
-        jvmMain.dependencies {
-            implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.gst1.java.core)
-            implementation(libs.gst1.java.swing)
-            implementation(libs.jna)
-            implementation(libs.jna.platform)
-            implementation(libs.slf4j.simple)
-        }
 
         iosMain.dependencies {
         }
